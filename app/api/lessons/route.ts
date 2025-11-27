@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type LessonInsert = Database['public']['Tables']['lessons']['Insert'];
 
 // GET /api/lessons - List lessons
 export async function GET(request: NextRequest) {
@@ -52,16 +55,25 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('lessons') as any)
-      .insert({
-        group_id: body.group_id,
-        date: body.date,
-        start_time: body.start_time,
-        end_time: body.end_time,
-        notes: body.notes || null,
-        status: 'scheduled',
-      })
+    const lessonData: LessonInsert = {
+      group_id: body.group_id,
+      date: body.date,
+      start_time: body.start_time,
+      end_time: body.end_time,
+      notes: body.notes || null,
+      status: 'scheduled',
+    };
+
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type LessonQueryBuilder = {
+      insert: (values: LessonInsert) => {
+        select: (columns: string) => {
+          single: () => Promise<{ data: Database['public']['Tables']['lessons']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('lessons') as unknown as LessonQueryBuilder)
+      .insert(lessonData)
       .select(`
         *,
         group:groups(id, name)

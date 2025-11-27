@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Payment, PaymentFormData, PaymentWithMember, ApiResponse, PaymentFilterParams } from '@/types';
+import type { Database } from '@/lib/supabase';
+
+type PaymentInsert = Database['public']['Tables']['payments']['Insert'];
+type PaymentUpdate = Database['public']['Tables']['payments']['Update'];
 
 // Lazy initialization - client is created when first needed
 function getSupabaseClient() {
@@ -45,9 +49,24 @@ export const paymentsService = {
   // Create payment record
   async create(paymentData: PaymentFormData): Promise<ApiResponse<Payment>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('payments') as any)
-      .insert(paymentData)
+    const insertData: PaymentInsert = {
+      member_id: paymentData.member_id,
+      period: paymentData.period,
+      amount: paymentData.amount,
+      paid: paymentData.paid || false,
+      paid_at: paymentData.paid ? new Date().toISOString() : null,
+      notes: 'notes' in paymentData ? ((paymentData as PaymentFormData & { notes?: string }).notes || null) : null,
+    };
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type PaymentQueryBuilder = {
+      insert: (values: PaymentInsert) => {
+        select: () => {
+          single: () => Promise<{ data: Database['public']['Tables']['payments']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('payments') as unknown as PaymentQueryBuilder)
+      .insert(insertData)
       .select()
       .single();
 
@@ -61,12 +80,22 @@ export const paymentsService = {
   // Mark payment as paid
   async markAsPaid(id: string): Promise<ApiResponse<Payment>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('payments') as any)
-      .update({ 
-        paid: true, 
-        paid_at: new Date().toISOString() 
-      })
+    const updateData: PaymentUpdate = {
+      paid: true,
+      paid_at: new Date().toISOString(),
+    };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type PaymentQueryBuilder = {
+      update: (values: PaymentUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['payments']['Row'] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('payments') as unknown as PaymentQueryBuilder)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -81,12 +110,22 @@ export const paymentsService = {
   // Mark payment as unpaid
   async markAsUnpaid(id: string): Promise<ApiResponse<Payment>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('payments') as any)
-      .update({ 
-        paid: false, 
-        paid_at: null 
-      })
+    const updateData: PaymentUpdate = {
+      paid: false,
+      paid_at: null,
+    };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type PaymentQueryBuilder = {
+      update: (values: PaymentUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['payments']['Row'] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('payments') as unknown as PaymentQueryBuilder)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -117,25 +156,40 @@ export const paymentsService = {
   async generatePeriod(period: string, defaultAmount: number): Promise<ApiResponse<Payment[]>> {
     const supabase = getSupabaseClient();
     // Get all active members
-    const { data: members, error: membersError } = await supabase
-      .from('members')
+    // Type assertion needed because Supabase type inference fails for select() with complex schemas
+    type MemberSelectBuilder = {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => Promise<{ data: { id: string }[] | null; error: { message: string } | null }>;
+      };
+    };
+    const { data: members, error: membersError } = await (supabase.from('members') as unknown as MemberSelectBuilder)
       .select('id')
       .eq('status', 'active');
 
-    if (membersError) {
-      return { data: null, error: membersError.message, success: false };
+    if (membersError || !members) {
+      return { data: null, error: membersError?.message || 'Members not found', success: false };
     }
 
     // Create payment records
-    const paymentRecords = members.map(member => ({
+    const paymentRecords: PaymentInsert[] = members.map(member => ({
       member_id: member.id,
       period,
       amount: defaultAmount,
       paid: false,
+      paid_at: null,
+      notes: null,
     }));
 
-    const { data, error } = await supabase
-      .from('payments')
+    // Type assertion needed because Supabase type inference fails for upsert() with complex schemas
+    type PaymentQueryBuilder = {
+      upsert: (
+        values: PaymentInsert[],
+        options?: { onConflict?: string; ignoreDuplicates?: boolean }
+      ) => {
+        select: () => Promise<{ data: PaymentInsert[] | null; error: { message: string } | null }>;
+      };
+    };
+    const { data, error } = await (supabase.from('payments') as unknown as PaymentQueryBuilder)
       .upsert(paymentRecords, {
         onConflict: 'member_id,period',
         ignoreDuplicates: true,
@@ -175,13 +229,18 @@ export const paymentsService = {
   // Get payment statistics for a period
   async getStats(period: string): Promise<ApiResponse<any>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('payments')
+    // Type assertion needed because Supabase type inference fails for select() with complex schemas
+    type PaymentSelectBuilder = {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => Promise<{ data: { amount: number; paid: boolean }[] | null; error: { message: string } | null }>;
+      };
+    };
+    const { data, error } = await (supabase.from('payments') as unknown as PaymentSelectBuilder)
       .select('amount, paid')
       .eq('period', period);
 
-    if (error) {
-      return { data: null, error: error.message, success: false };
+    if (error || !data) {
+      return { data: null, error: error?.message || 'Data not found', success: false };
     }
 
     const stats = {

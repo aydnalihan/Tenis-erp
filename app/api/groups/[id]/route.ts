@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type GroupUpdate = Database['public']['Tables']['groups']['Update'];
+type MemberUpdate = Database['public']['Tables']['members']['Update'];
 
 // GET /api/groups/[id] - Get single group
 export async function GET(
@@ -47,14 +51,23 @@ export async function PUT(
     const supabase = await createClient();
     const body = await request.json();
 
-    const updateData: Record<string, unknown> = {};
+    const updateData: GroupUpdate = {};
     
     if (body.name !== undefined) updateData.name = body.name;
     if (body.description !== undefined) updateData.description = body.description || null;
     if (body.coach_id !== undefined) updateData.coach_id = body.coach_id || null;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('groups') as any)
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type GroupQueryBuilder = {
+      update: (values: GroupUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['groups']['Row'] | null; error: { message: string; code?: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('groups') as unknown as GroupQueryBuilder)
       .update(updateData)
       .eq('id', id)
       .select()
@@ -87,9 +100,15 @@ export async function DELETE(
     const supabase = await createClient();
 
     // First, remove group_id from all members in this group
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('members') as any)
-      .update({ group_id: null })
+    const memberUpdate: MemberUpdate = { group_id: null };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type MemberQueryBuilder = {
+      update: (values: MemberUpdate) => {
+        eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+    await (supabase.from('members') as unknown as MemberQueryBuilder)
+      .update(memberUpdate)
       .eq('group_id', id);
 
     const { error } = await supabase

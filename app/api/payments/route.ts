@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type PaymentInsert = Database['public']['Tables']['payments']['Insert'];
 
 // GET /api/payments - Get payments
 export async function GET(request: NextRequest) {
@@ -52,16 +55,25 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('payments') as any)
-      .insert({
-        member_id: body.member_id,
-        period: body.period,
-        amount: body.amount,
-        paid: body.paid || false,
-        paid_at: body.paid ? new Date().toISOString() : null,
-        notes: body.notes || null,
-      })
+    const paymentData: PaymentInsert = {
+      member_id: body.member_id,
+      period: body.period,
+      amount: body.amount,
+      paid: body.paid || false,
+      paid_at: body.paid ? new Date().toISOString() : null,
+      notes: body.notes || null,
+    };
+
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type PaymentQueryBuilder = {
+      insert: (values: PaymentInsert) => {
+        select: (columns: string) => {
+          single: () => Promise<{ data: Database['public']['Tables']['payments']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('payments') as unknown as PaymentQueryBuilder)
+      .insert(paymentData)
       .select(`
         *,
         member:members(id, name, surname)

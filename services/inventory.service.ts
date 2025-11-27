@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/client';
 import type { InventoryItem, InventoryFormData, ApiResponse, FilterParams } from '@/types';
+import type { Database } from '@/lib/supabase';
+
+type InventoryInsert = Database['public']['Tables']['inventory']['Insert'];
+type InventoryUpdate = Database['public']['Tables']['inventory']['Update'];
 
 // Lazy initialization - client is created when first needed
 function getSupabaseClient() {
@@ -49,9 +53,23 @@ export const inventoryService = {
   // Create new item
   async create(itemData: InventoryFormData): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('inventory') as any)
-      .insert(itemData)
+    const insertData: InventoryInsert = {
+      name: itemData.name,
+      category: itemData.category || null,
+      quantity: itemData.quantity || 0,
+      min_stock: itemData.min_stock || 0,
+      description: itemData.description || null,
+    };
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type InventoryQueryBuilder = {
+      insert: (values: InventoryInsert) => {
+        select: () => {
+          single: () => Promise<{ data: Database['public']['Tables']['inventory']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('inventory') as unknown as InventoryQueryBuilder)
+      .insert(insertData)
       .select()
       .single();
 
@@ -65,9 +83,25 @@ export const inventoryService = {
   // Update item
   async update(id: string, itemData: Partial<InventoryFormData>): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('inventory') as any)
-      .update(itemData)
+    const updateData: InventoryUpdate = {
+      name: itemData.name,
+      category: itemData.category !== undefined ? (itemData.category || null) : undefined,
+      quantity: itemData.quantity,
+      min_stock: itemData.min_stock,
+      description: itemData.description !== undefined ? (itemData.description || null) : undefined,
+    };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type InventoryQueryBuilder = {
+      update: (values: InventoryUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['inventory']['Row'] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('inventory') as unknown as InventoryQueryBuilder)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -97,8 +131,15 @@ export const inventoryService = {
   // Add stock
   async addStock(id: string, amount: number): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: current, error: fetchError } = await (supabase.from('inventory') as any)
+    // Type assertion needed because Supabase type inference fails for select() with complex schemas
+    type InventorySelectBuilder = {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          single: () => Promise<{ data: { quantity: number } | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data: current, error: fetchError } = await (supabase.from('inventory') as unknown as InventorySelectBuilder)
       .select('quantity')
       .eq('id', id)
       .single();
@@ -107,9 +148,19 @@ export const inventoryService = {
       return { data: null, error: fetchError?.message || 'Item not found', success: false };
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('inventory') as any)
-      .update({ quantity: (current as { quantity: number }).quantity + amount })
+    const updateData: InventoryUpdate = { quantity: current.quantity + amount };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type InventoryQueryBuilder = {
+      update: (values: InventoryUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['inventory']['Row'] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('inventory') as unknown as InventoryQueryBuilder)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -124,8 +175,15 @@ export const inventoryService = {
   // Remove stock
   async removeStock(id: string, amount: number): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: current, error: fetchError } = await (supabase.from('inventory') as any)
+    // Type assertion needed because Supabase type inference fails for select() with complex schemas
+    type InventorySelectBuilder = {
+      select: (columns: string) => {
+        eq: (column: string, value: string) => {
+          single: () => Promise<{ data: { quantity: number } | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data: current, error: fetchError } = await (supabase.from('inventory') as unknown as InventorySelectBuilder)
       .select('quantity')
       .eq('id', id)
       .single();
@@ -134,11 +192,20 @@ export const inventoryService = {
       return { data: null, error: fetchError?.message || 'Item not found', success: false };
     }
 
-    const newQuantity = Math.max(0, (current as { quantity: number }).quantity - amount);
-
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('inventory') as any)
-      .update({ quantity: newQuantity })
+    const newQuantity = Math.max(0, current.quantity - amount);
+    const updateData: InventoryUpdate = { quantity: newQuantity };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type InventoryQueryBuilder = {
+      update: (values: InventoryUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['inventory']['Row'] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('inventory') as unknown as InventoryQueryBuilder)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -155,15 +222,18 @@ export const inventoryService = {
     const supabase = getSupabaseClient();
     
     // Get all items and filter for low stock
-    const { data: allItems, error: allError } = await supabase
-      .from('inventory')
+    // Type assertion needed because Supabase type inference fails for select() with complex schemas
+    type InventorySelectBuilder = {
+      select: (columns: string) => Promise<{ data: Database['public']['Tables']['inventory']['Row'][] | null; error: { message: string } | null }>;
+    };
+    const { data: allItems, error: allError } = await (supabase.from('inventory') as unknown as InventorySelectBuilder)
       .select('*');
 
     if (allError) {
       return { data: null, error: allError.message, success: false };
     }
 
-    const lowStockItems = allItems.filter((item: any) => item.quantity < (item.min_stock || 0));
+    const lowStockItems = (allItems || []).filter((item: Database['public']['Tables']['inventory']['Row']) => item.quantity < (item.min_stock || 0));
 
     return { data: lowStockItems as InventoryItem[], error: null, success: true };
   },

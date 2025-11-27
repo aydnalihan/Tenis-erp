@@ -1,5 +1,8 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Attendance, ApiResponse } from '@/types';
+import type { Database } from '@/lib/supabase';
+
+type AttendanceInsert = Database['public']['Tables']['attendance']['Insert'];
 
 // Lazy initialization - client is created when first needed
 function getSupabaseClient() {
@@ -31,14 +34,22 @@ export const attendanceService = {
     attendanceData: { member_id: string; status: 'present' | 'absent' }[]
   ): Promise<ApiResponse<Attendance[]>> {
     const supabase = getSupabaseClient();
-    const records = attendanceData.map(item => ({
+    const records: AttendanceInsert[] = attendanceData.map(item => ({
       lesson_id: lessonId,
       member_id: item.member_id,
       status: item.status,
     }));
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('attendance') as any)
+    // Type assertion needed because Supabase type inference fails for upsert() with complex schemas
+    type AttendanceQueryBuilder = {
+      upsert: (
+        values: AttendanceInsert[],
+        options?: { onConflict?: string; ignoreDuplicates?: boolean }
+      ) => {
+        select: () => Promise<{ data: AttendanceInsert[] | null; error: { message: string } | null }>;
+      };
+    };
+    const { data, error } = await (supabase.from('attendance') as unknown as AttendanceQueryBuilder)
       .upsert(records, {
         onConflict: 'lesson_id,member_id',
         ignoreDuplicates: false,
@@ -59,13 +70,24 @@ export const attendanceService = {
     status: 'present' | 'absent'
   ): Promise<ApiResponse<Attendance>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('attendance') as any)
-      .upsert({
-        lesson_id: lessonId,
-        member_id: memberId,
-        status,
-      }, {
+    const attendanceData: AttendanceInsert = {
+      lesson_id: lessonId,
+      member_id: memberId,
+      status,
+    };
+    // Type assertion needed because Supabase type inference fails for upsert() with complex schemas
+    type AttendanceQueryBuilder = {
+      upsert: (
+        values: AttendanceInsert,
+        options?: { onConflict?: string }
+      ) => {
+        select: () => {
+          single: () => Promise<{ data: AttendanceInsert | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('attendance') as unknown as AttendanceQueryBuilder)
+      .upsert(attendanceData, {
         onConflict: 'lesson_id,member_id',
       })
       .select()
@@ -101,12 +123,17 @@ export const attendanceService = {
       return { data: null, error: error.message, success: false };
     }
 
+    type AttendanceWithLesson = {
+      status: 'present' | 'absent';
+      lesson: { date: string } | null;
+    };
+    const typedData = data as AttendanceWithLesson[];
     const stats = {
-      total: data.length,
-      present: data.filter((a: any) => a.status === 'present').length,
-      absent: data.filter((a: any) => a.status === 'absent').length,
-      rate: data.length > 0 
-        ? Math.round((data.filter((a: any) => a.status === 'present').length / data.length) * 100)
+      total: typedData.length,
+      present: typedData.filter(a => a.status === 'present').length,
+      absent: typedData.filter(a => a.status === 'absent').length,
+      rate: typedData.length > 0 
+        ? Math.round((typedData.filter(a => a.status === 'present').length / typedData.length) * 100)
         : 0,
     };
 
@@ -114,10 +141,13 @@ export const attendanceService = {
   },
 
   // Get absentee list for a period
-  async getAbsentees(startDate: string, endDate: string, minAbsences: number = 2): Promise<ApiResponse<any[]>> {
+  async getAbsentees(startDate: string, endDate: string, minAbsences: number = 2): Promise<ApiResponse<Database['public']['Functions']['get_absentees']['Returns']>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase as any)
+    // Type assertion needed because Supabase type inference fails for rpc() with complex schemas
+    type SupabaseRPC = {
+      rpc: (functionName: string, params: { start_date: string; end_date: string; min_absences: number }) => Promise<{ data: Database['public']['Functions']['get_absentees']['Returns'] | null; error: { message: string } | null }>;
+    };
+    const { data, error } = await (supabase as unknown as SupabaseRPC)
       .rpc('get_absentees', {
         start_date: startDate,
         end_date: endDate,

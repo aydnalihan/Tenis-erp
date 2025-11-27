@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type LessonUpdate = Database['public']['Tables']['lessons']['Update'];
 
 // GET /api/lessons/[id] - Get single lesson
 export async function GET(
@@ -51,7 +54,7 @@ export async function PUT(
     const supabase = await createClient();
     const body = await request.json();
 
-    const updateData: Record<string, unknown> = {};
+    const updateData: LessonUpdate = {};
     
     if (body.group_id !== undefined) updateData.group_id = body.group_id;
     if (body.date !== undefined) updateData.date = body.date;
@@ -60,8 +63,17 @@ export async function PUT(
     if (body.notes !== undefined) updateData.notes = body.notes || null;
     if (body.status !== undefined) updateData.status = body.status;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('lessons') as any)
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type LessonQueryBuilder = {
+      update: (values: LessonUpdate) => {
+        eq: (column: string, value: string) => {
+          select: (columns: string) => {
+            single: () => Promise<{ data: Database['public']['Tables']['lessons']['Row'] | null; error: { message: string; code?: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('lessons') as unknown as LessonQueryBuilder)
       .update(updateData)
       .eq('id', id)
       .select(`

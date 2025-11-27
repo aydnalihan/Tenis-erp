@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type InventoryInsert = Database['public']['Tables']['inventory']['Insert'];
 
 // GET /api/inventory - Get inventory items
 export async function GET(request: NextRequest) {
@@ -44,15 +47,24 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('inventory') as any)
-      .insert({
-        name: body.name,
-        category: body.category || null,
-        quantity: body.quantity || 0,
-        min_stock: body.min_stock || 0,
-        description: body.description || null,
-      })
+    const inventoryData: InventoryInsert = {
+      name: body.name,
+      category: body.category || null,
+      quantity: body.quantity || 0,
+      min_stock: body.min_stock || 0,
+      description: body.description || null,
+    };
+
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type InventoryQueryBuilder = {
+      insert: (values: InventoryInsert) => {
+        select: () => {
+          single: () => Promise<{ data: Database['public']['Tables']['inventory']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('inventory') as unknown as InventoryQueryBuilder)
+      .insert(inventoryData)
       .select()
       .single();
 

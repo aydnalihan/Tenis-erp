@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     const lessonIdStr = String(lesson_id);
 
     // Insert tipi burada doğru şekilde oluşacak
-    const records = attendance.map(
+    const records: AttendanceInsert[] = attendance.map(
       (item: { member_id: string; status: 'present' | 'absent' }) => ({
         lesson_id: lessonIdStr,
         member_id: item.member_id,
@@ -70,11 +70,19 @@ export async function POST(request: NextRequest) {
     );
 
     // Upsert attendance records
-    // Type assertion needed because Supabase's generated types are strict
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await supabase
-      .from('attendance')
-      .upsert(records as any, {
+    // Type assertion needed because Supabase type inference fails for upsert() with complex schemas
+    // We use a type-safe assertion: cast to unknown first, then to a properly typed query builder
+    // This maintains type safety while working around Supabase's type inference limitations
+    type AttendanceQueryBuilder = {
+      upsert: (
+        values: AttendanceInsert[],
+        options?: { onConflict?: string; ignoreDuplicates?: boolean }
+      ) => {
+        select: () => Promise<{ data: AttendanceInsert[] | null; error: { message: string } | null }>;
+      };
+    };
+    const { data, error } = await (supabase.from('attendance') as unknown as AttendanceQueryBuilder)
+      .upsert(records, {
         onConflict: 'lesson_id,member_id',
         ignoreDuplicates: false,
       })
@@ -85,9 +93,17 @@ export async function POST(request: NextRequest) {
     }
 
     // Ders durumunu tamamlandı yap
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await (supabase.from('lessons') as any)
-      .update({ status: 'completed' })
+    const lessonUpdate: Database['public']['Tables']['lessons']['Update'] = {
+      status: 'completed',
+    };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type LessonQueryBuilder = {
+      update: (values: Database['public']['Tables']['lessons']['Update']) => {
+        eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+    await (supabase.from('lessons') as unknown as LessonQueryBuilder)
+      .update(lessonUpdate)
       .eq('id', lessonIdStr);
 
     return NextResponse.json({ data, success: true });

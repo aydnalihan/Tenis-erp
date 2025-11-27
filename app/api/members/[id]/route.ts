@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type MemberUpdate = Database['public']['Tables']['members']['Update'];
 
 // GET /api/members/[id] - Get single member
 export async function GET(
@@ -46,7 +49,7 @@ export async function PUT(
     const supabase = await createClient();
     const body = await request.json();
 
-    const updateData: Record<string, unknown> = {};
+    const updateData: MemberUpdate = {};
     
     // Only include fields that are provided
     if (body.name !== undefined) updateData.name = body.name;
@@ -60,8 +63,17 @@ export async function PUT(
     if (body.group_id !== undefined) updateData.group_id = body.group_id || null;
     if (body.status !== undefined) updateData.status = body.status;
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('members') as any)
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type MemberQueryBuilder = {
+      update: (values: MemberUpdate) => {
+        eq: (column: string, value: string) => {
+          select: (columns: string) => {
+            single: () => Promise<{ data: Database['public']['Tables']['members']['Row'] | null; error: { message: string; code?: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('members') as unknown as MemberQueryBuilder)
       .update(updateData)
       .eq('id', id)
       .select(`

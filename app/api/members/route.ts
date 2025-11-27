@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type MemberInsert = Database['public']['Tables']['members']['Insert'];
 
 // GET /api/members - List all members
 export async function GET(request: NextRequest) {
@@ -73,20 +76,29 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('members') as any)
-      .insert({
-        name: body.name,
-        surname: body.surname,
-        email: body.email || null,
-        phone: body.phone || null,
-        birthdate: body.birthdate || null,
-        is_child: body.is_child || false,
-        parent_name: body.parent_name || null,
-        parent_phone: body.parent_phone || null,
-        group_id: body.group_id || null,
-        status: 'active',
-      })
+    const memberData: MemberInsert = {
+      name: body.name,
+      surname: body.surname,
+      email: body.email || null,
+      phone: body.phone || null,
+      birthdate: body.birthdate || null,
+      is_child: body.is_child || false,
+      parent_name: body.parent_name || null,
+      parent_phone: body.parent_phone || null,
+      group_id: body.group_id || null,
+      status: 'active',
+    };
+
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type MemberQueryBuilder = {
+      insert: (values: MemberInsert) => {
+        select: (columns: string) => {
+          single: () => Promise<{ data: Database['public']['Tables']['members']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('members') as unknown as MemberQueryBuilder)
+      .insert(memberData)
       .select(`
         *,
         group:groups(id, name)

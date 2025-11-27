@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type GroupInsert = Database['public']['Tables']['groups']['Insert'];
 
 // GET /api/groups - List all groups
 export async function GET(request: NextRequest) {
@@ -48,13 +51,22 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('groups') as any)
-      .insert({
-        name: body.name,
-        description: body.description || null,
-        coach_id: body.coach_id || null,
-      })
+    const groupData: GroupInsert = {
+      name: body.name,
+      description: body.description || null,
+      coach_id: body.coach_id || null,
+    };
+
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type GroupQueryBuilder = {
+      insert: (values: GroupInsert) => {
+        select: () => {
+          single: () => Promise<{ data: Database['public']['Tables']['groups']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('groups') as unknown as GroupQueryBuilder)
+      .insert(groupData)
       .select()
       .single();
 

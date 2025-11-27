@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Lesson, LessonFormData, LessonWithAttendance, ApiResponse, FilterParams } from '@/types';
+import type { Database } from '@/lib/supabase';
+
+type LessonInsert = Database['public']['Tables']['lessons']['Insert'];
+type LessonUpdate = Database['public']['Tables']['lessons']['Update'];
 
 // Lazy initialization - client is created when first needed
 function getSupabaseClient() {
@@ -60,9 +64,24 @@ export const lessonsService = {
   // Create new lesson
   async create(lessonData: LessonFormData): Promise<ApiResponse<Lesson>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('lessons') as any)
-      .insert(lessonData)
+    const insertData: LessonInsert = {
+      group_id: lessonData.group_id,
+      date: lessonData.date,
+      start_time: lessonData.start_time,
+      end_time: lessonData.end_time,
+      notes: lessonData.notes || null,
+      status: lessonData.status || 'scheduled',
+    };
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type LessonQueryBuilder = {
+      insert: (values: LessonInsert) => {
+        select: () => {
+          single: () => Promise<{ data: Database['public']['Tables']['lessons']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('lessons') as unknown as LessonQueryBuilder)
+      .insert(insertData)
       .select()
       .single();
 
@@ -76,9 +95,26 @@ export const lessonsService = {
   // Update lesson
   async update(id: string, lessonData: Partial<LessonFormData>): Promise<ApiResponse<Lesson>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('lessons') as any)
-      .update(lessonData)
+    const updateData: LessonUpdate = {
+      group_id: lessonData.group_id,
+      date: lessonData.date,
+      start_time: lessonData.start_time,
+      end_time: lessonData.end_time,
+      notes: lessonData.notes !== undefined ? (lessonData.notes || null) : undefined,
+      status: lessonData.status,
+    };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type LessonQueryBuilder = {
+      update: (values: LessonUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['lessons']['Row'] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('lessons') as unknown as LessonQueryBuilder)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();

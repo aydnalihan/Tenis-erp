@@ -1,5 +1,10 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Group, GroupFormData, GroupWithMembers, ApiResponse, PaginatedResponse, FilterParams } from '@/types';
+import type { Database } from '@/lib/supabase';
+
+type GroupInsert = Database['public']['Tables']['groups']['Insert'];
+type GroupUpdate = Database['public']['Tables']['groups']['Update'];
+type MemberUpdate = Database['public']['Tables']['members']['Update'];
 
 // Lazy initialization - client is created when first needed
 function getSupabaseClient() {
@@ -71,9 +76,21 @@ export const groupsService = {
   // Create new group
   async create(groupData: GroupFormData): Promise<ApiResponse<Group>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('groups') as any)
-      .insert(groupData)
+    const insertData: GroupInsert = {
+      name: groupData.name,
+      description: groupData.description || null,
+      coach_id: groupData.coach_id || null,
+    };
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type GroupQueryBuilder = {
+      insert: (values: GroupInsert) => {
+        select: () => {
+          single: () => Promise<{ data: Database['public']['Tables']['groups']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('groups') as unknown as GroupQueryBuilder)
+      .insert(insertData)
       .select()
       .single();
 
@@ -87,9 +104,23 @@ export const groupsService = {
   // Update group
   async update(id: string, groupData: Partial<GroupFormData>): Promise<ApiResponse<Group>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('groups') as any)
-      .update(groupData)
+    const updateData: GroupUpdate = {
+      name: groupData.name,
+      description: groupData.description !== undefined ? (groupData.description || null) : undefined,
+      coach_id: groupData.coach_id !== undefined ? (groupData.coach_id || null) : undefined,
+    };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type GroupQueryBuilder = {
+      update: (values: GroupUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['groups']['Row'] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('groups') as unknown as GroupQueryBuilder)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();
@@ -119,9 +150,15 @@ export const groupsService = {
   // Add member to group
   async addMember(groupId: string, memberId: string): Promise<ApiResponse<null>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('members') as any)
-      .update({ group_id: groupId })
+    const updateData: MemberUpdate = { group_id: groupId };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type MemberQueryBuilder = {
+      update: (values: MemberUpdate) => {
+        eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+    const { error } = await (supabase.from('members') as unknown as MemberQueryBuilder)
+      .update(updateData)
       .eq('id', memberId);
 
     if (error) {
@@ -134,9 +171,15 @@ export const groupsService = {
   // Remove member from group
   async removeMember(memberId: string): Promise<ApiResponse<null>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { error } = await (supabase.from('members') as any)
-      .update({ group_id: null })
+    const updateData: MemberUpdate = { group_id: null };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type MemberQueryBuilder = {
+      update: (values: MemberUpdate) => {
+        eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+    const { error } = await (supabase.from('members') as unknown as MemberQueryBuilder)
+      .update(updateData)
       .eq('id', memberId);
 
     if (error) {

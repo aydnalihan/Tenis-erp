@@ -1,5 +1,9 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Member, MemberFormData, MemberWithGroup, ApiResponse, PaginatedResponse, MemberFilterParams } from '@/types';
+import type { Database } from '@/lib/supabase';
+
+type MemberInsert = Database['public']['Tables']['members']['Insert'];
+type MemberUpdate = Database['public']['Tables']['members']['Update'];
 
 // Lazy initialization - client is created when first needed
 function getSupabaseClient() {
@@ -82,9 +86,28 @@ export const membersService = {
   // Create new member
   async create(memberData: MemberFormData): Promise<ApiResponse<Member>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('members') as any)
-      .insert(memberData)
+    const insertData: MemberInsert = {
+      name: memberData.name,
+      surname: memberData.surname,
+      email: memberData.email || null,
+      phone: memberData.phone || null,
+      birthdate: memberData.birthdate || null,
+      is_child: memberData.is_child || false,
+      parent_name: memberData.parent_name || null,
+      parent_phone: memberData.parent_phone || null,
+      group_id: memberData.group_id || null,
+      status: 'active',
+    };
+    // Type assertion needed because Supabase type inference fails for insert() with complex schemas
+    type MemberQueryBuilder = {
+      insert: (values: MemberInsert) => {
+        select: () => {
+          single: () => Promise<{ data: Database['public']['Tables']['members']['Row'] | null; error: { message: string } | null }>;
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('members') as unknown as MemberQueryBuilder)
+      .insert(insertData)
       .select()
       .single();
 
@@ -98,9 +121,30 @@ export const membersService = {
   // Update member
   async update(id: string, memberData: Partial<MemberFormData>): Promise<ApiResponse<Member>> {
     const supabase = getSupabaseClient();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('members') as any)
-      .update(memberData)
+    const updateData: MemberUpdate = {
+      name: memberData.name,
+      surname: memberData.surname,
+      email: memberData.email !== undefined ? (memberData.email || null) : undefined,
+      phone: memberData.phone !== undefined ? (memberData.phone || null) : undefined,
+      birthdate: memberData.birthdate !== undefined ? (memberData.birthdate || null) : undefined,
+      is_child: memberData.is_child,
+      parent_name: memberData.parent_name !== undefined ? (memberData.parent_name || null) : undefined,
+      parent_phone: memberData.parent_phone !== undefined ? (memberData.parent_phone || null) : undefined,
+      group_id: memberData.group_id !== undefined ? (memberData.group_id || null) : undefined,
+      status: 'status' in memberData ? (memberData as Partial<MemberFormData & { status?: 'active' | 'inactive' }>).status : undefined,
+    };
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type MemberQueryBuilder = {
+      update: (values: MemberUpdate) => {
+        eq: (column: string, value: string) => {
+          select: () => {
+            single: () => Promise<{ data: Database['public']['Tables']['members']['Row'] | null; error: { message: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('members') as unknown as MemberQueryBuilder)
+      .update(updateData)
       .eq('id', id)
       .select()
       .single();

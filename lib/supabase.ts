@@ -43,32 +43,43 @@ export { updateSession } from './supabase/middleware';
 // Type exports for convenience
 export type { User, Session, AuthError } from '@supabase/supabase-js';
 
-// Database types (will be generated from Supabase)
+/**
+ * Database type definitions generated from Supabase schema
+ * 
+ * These types are manually maintained to match the actual database schema
+ * defined in lib/database/schema.sql
+ */
 export type Database = {
   public: {
     Tables: {
-      members: {
+      profiles: {
         Row: {
           id: string;
-          name: string;
-          surname: string;
-          email: string | null;
-          phone: string | null;
-          birthdate: string | null;
-          is_child: boolean;
-          parent_name: string | null;
-          parent_phone: string | null;
-          group_id: string | null;
-          status: 'active' | 'inactive';
+          email: string;
+          full_name: string | null;
+          role: 'admin' | 'coach';
+          avatar_url: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['members']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+        Insert: {
           id?: string;
+          email: string;
+          full_name?: string | null;
+          role?: 'admin' | 'coach';
+          avatar_url?: string | null;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['members']['Insert']>;
+        Update: Partial<{
+          id?: string;
+          email?: string;
+          full_name?: string | null;
+          role?: 'admin' | 'coach';
+          avatar_url?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }>;
       };
       groups: {
         Row: {
@@ -79,12 +90,69 @@ export type Database = {
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['groups']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+        Insert: {
           id?: string;
+          name: string;
+          description?: string | null;
+          coach_id?: string | null;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['groups']['Insert']>;
+        Update: Partial<{
+          id?: string;
+          name?: string;
+          description?: string | null;
+          coach_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }>;
+      };
+      members: {
+        Row: {
+          id: string;
+          name: string;
+          surname: string;
+          phone: string | null;
+          email: string | null;
+          birthdate: string | null;
+          is_child: boolean;
+          parent_name: string | null;
+          parent_phone: string | null;
+          group_id: string | null;
+          status: 'active' | 'inactive';
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          name: string;
+          surname: string;
+          phone?: string | null;
+          email?: string | null;
+          birthdate?: string | null;
+          is_child?: boolean;
+          parent_name?: string | null;
+          parent_phone?: string | null;
+          group_id?: string | null;
+          status?: 'active' | 'inactive';
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<{
+          id?: string;
+          name?: string;
+          surname?: string;
+          phone?: string | null;
+          email?: string | null;
+          birthdate?: string | null;
+          is_child?: boolean;
+          parent_name?: string | null;
+          parent_phone?: string | null;
+          group_id?: string | null;
+          status?: 'active' | 'inactive';
+          created_at?: string;
+          updated_at?: string;
+        }>;
       };
       lessons: {
         Row: {
@@ -93,17 +161,33 @@ export type Database = {
           date: string;
           start_time: string;
           end_time: string;
-          status: 'scheduled' | 'completed' | 'cancelled';
           notes: string | null;
+          status: 'scheduled' | 'completed' | 'cancelled';
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['lessons']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+        Insert: {
           id?: string;
+          group_id: string;
+          date: string;
+          start_time: string;
+          end_time: string;
+          notes?: string | null;
+          status?: 'scheduled' | 'completed' | 'cancelled';
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['lessons']['Insert']>;
+        Update: Partial<{
+          id?: string;
+          group_id?: string;
+          date?: string;
+          start_time?: string;
+          end_time?: string;
+          notes?: string | null;
+          status?: 'scheduled' | 'completed' | 'cancelled';
+          created_at?: string;
+          updated_at?: string;
+        }>;
       };
       attendance: {
         Row: {
@@ -113,84 +197,157 @@ export type Database = {
           status: 'present' | 'absent';
           created_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['attendance']['Row'], 'id' | 'created_at'> & {
+        Insert: {
+          lesson_id: string;
+          member_id: string;
+          status: 'present' | 'absent';
           id?: string;
           created_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['attendance']['Insert']>;
+        Update: Partial<{
+          lesson_id: string;
+          member_id: string;
+          status: 'present' | 'absent';
+          id?: string;
+          created_at?: string;
+        }>;
       };
       payments: {
         Row: {
           id: string;
           member_id: string;
-          amount: number;
           period: string;
+          amount: number;
           paid: boolean;
           paid_at: string | null;
           notes: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['payments']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+        Insert: {
           id?: string;
+          member_id: string;
+          period: string;
+          amount: number;
+          paid?: boolean;
+          paid_at?: string | null;
+          notes?: string | null;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['payments']['Insert']>;
+        Update: Partial<{
+          id?: string;
+          member_id?: string;
+          period?: string;
+          amount?: number;
+          paid?: boolean;
+          paid_at?: string | null;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }>;
       };
       inventory: {
         Row: {
           id: string;
           name: string;
-          description: string | null;
           category: string | null;
           quantity: number;
           min_stock: number;
+          description: string | null;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['inventory']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+        Insert: {
           id?: string;
-          created_at?: string;
-          updated_at?: string;
-        };
-        Update: Partial<Database['public']['Tables']['inventory']['Insert']>;
-      };
-      coaches: {
-        Row: {
-          id: string;
-          user_id: string;
           name: string;
-          phone: string | null;
-          specialty: string | null;
-          created_at: string;
-          updated_at: string;
-        };
-        Insert: Omit<Database['public']['Tables']['coaches']['Row'], 'id' | 'created_at' | 'updated_at'> & {
-          id?: string;
+          category?: string | null;
+          quantity?: number;
+          min_stock?: number;
+          description?: string | null;
           created_at?: string;
           updated_at?: string;
         };
-        Update: Partial<Database['public']['Tables']['coaches']['Insert']>;
+        Update: Partial<{
+          id?: string;
+          name?: string;
+          category?: string | null;
+          quantity?: number;
+          min_stock?: number;
+          description?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }>;
       };
     };
     Views: {
-      [_ in never]: never;
+      member_details: {
+        Row: {
+          id: string;
+          name: string;
+          surname: string;
+          phone: string | null;
+          email: string | null;
+          birthdate: string | null;
+          is_child: boolean;
+          parent_name: string | null;
+          parent_phone: string | null;
+          group_id: string | null;
+          status: 'active' | 'inactive';
+          created_at: string;
+          updated_at: string;
+          group_name: string | null;
+          group_description: string | null;
+        };
+      };
+      attendance_stats: {
+        Row: {
+          member_id: string;
+          name: string;
+          surname: string;
+          total_lessons: number;
+          present_count: number;
+          absent_count: number;
+          attendance_rate: number | null;
+        };
+      };
+      payment_stats: {
+        Row: {
+          member_id: string;
+          name: string;
+          surname: string;
+          total_periods: number;
+          paid_count: number;
+          pending_count: number;
+          total_amount: number | null;
+          paid_amount: number | null;
+        };
+      };
     };
     Functions: {
-      [_ in never]: never;
+      get_absentees: {
+        Args: {
+          start_date: string;
+          end_date: string;
+          min_absences: number;
+        };
+        Returns: Array<{
+          member_id: string;
+          name: string;
+          surname: string;
+          absences: number;
+        }>;
+      };
     };
     Enums: {
-      member_status: 'active' | 'inactive';
-      lesson_status: 'scheduled' | 'completed' | 'cancelled';
-      attendance_status: 'present' | 'absent';
+      [_ in never]: never;
     };
   };
-};
+}
 
 // Helper types
 export type Tables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Row'];
 export type InsertTables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Insert'];
 export type UpdateTables<T extends keyof Database['public']['Tables']> = Database['public']['Tables'][T]['Update'];
-export type Enums<T extends keyof Database['public']['Enums']> = Database['public']['Enums'][T];
+export type ViewTables<T extends keyof Database['public']['Views']> = Database['public']['Views'][T]['Row'];
 

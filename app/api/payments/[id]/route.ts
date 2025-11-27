@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase';
+
+type PaymentUpdate = Database['public']['Tables']['payments']['Update'];
 
 // PUT /api/payments/[id] - Update payment
 export async function PUT(
@@ -11,7 +14,7 @@ export async function PUT(
     const supabase = await createClient();
     const body = await request.json();
 
-    const updateData: Record<string, unknown> = {};
+    const updateData: PaymentUpdate = {};
     
     if (body.amount !== undefined) updateData.amount = body.amount;
     if (body.notes !== undefined) updateData.notes = body.notes || null;
@@ -20,8 +23,17 @@ export async function PUT(
       updateData.paid_at = body.paid ? new Date().toISOString() : null;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data, error } = await (supabase.from('payments') as any)
+    // Type assertion needed because Supabase type inference fails for update() with complex schemas
+    type PaymentQueryBuilder = {
+      update: (values: PaymentUpdate) => {
+        eq: (column: string, value: string) => {
+          select: (columns: string) => {
+            single: () => Promise<{ data: Database['public']['Tables']['payments']['Row'] | null; error: { message: string; code?: string } | null }>;
+          };
+        };
+      };
+    };
+    const { data, error } = await (supabase.from('payments') as unknown as PaymentQueryBuilder)
       .update(updateData)
       .eq('id', id)
       .select(`
