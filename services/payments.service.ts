@@ -1,12 +1,16 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Payment, PaymentFormData, PaymentWithMember, ApiResponse, PaymentFilterParams } from '@/types';
 
-const supabase = createClient();
+// Lazy initialization - client is created when first needed
+function getSupabaseClient() {
+  return createClient();
+}
 
 export const paymentsService = {
   // Get payments with filters
   async getAll(params?: PaymentFilterParams): Promise<ApiResponse<PaymentWithMember[]>> {
     const { search, period, paid, page = 1, pageSize = 50 } = params || {};
+    const supabase = getSupabaseClient();
     
     let query = supabase
       .from('payments')
@@ -40,6 +44,7 @@ export const paymentsService = {
 
   // Create payment record
   async create(paymentData: PaymentFormData): Promise<ApiResponse<Payment>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('payments')
       .insert(paymentData)
@@ -55,6 +60,7 @@ export const paymentsService = {
 
   // Mark payment as paid
   async markAsPaid(id: string): Promise<ApiResponse<Payment>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('payments')
       .update({ 
@@ -74,6 +80,7 @@ export const paymentsService = {
 
   // Mark payment as unpaid
   async markAsUnpaid(id: string): Promise<ApiResponse<Payment>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('payments')
       .update({ 
@@ -93,6 +100,7 @@ export const paymentsService = {
 
   // Delete payment
   async delete(id: string): Promise<ApiResponse<null>> {
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('payments')
       .delete()
@@ -107,6 +115,7 @@ export const paymentsService = {
 
   // Generate payments for a period (for all active members)
   async generatePeriod(period: string, defaultAmount: number): Promise<ApiResponse<Payment[]>> {
+    const supabase = getSupabaseClient();
     // Get all active members
     const { data: members, error: membersError } = await supabase
       .from('members')
@@ -142,6 +151,7 @@ export const paymentsService = {
 
   // Get overdue payments
   async getOverdue(): Promise<ApiResponse<PaymentWithMember[]>> {
+    const supabase = getSupabaseClient();
     const currentDate = new Date();
     const currentPeriod = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
     
@@ -164,6 +174,7 @@ export const paymentsService = {
 
   // Get payment statistics for a period
   async getStats(period: string): Promise<ApiResponse<any>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('payments')
       .select('amount, paid')

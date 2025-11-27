@@ -1,13 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
-import type { Database } from '@/lib/supabase'; // add this import
+import type { Database } from '@/lib/supabase';
 
-// GET /api/attendance - Get attendance records
+// Attendance tablosunun Insert tipini çekiyoruz
+type AttendanceInsert = Database['public']['Tables']['attendance']['Insert'];
+
+// GET /api/attendance
 export async function GET(request: NextRequest) {
   try {
     const supabase = await createClient();
     const { searchParams } = new URL(request.url);
-    
+
     const lessonId = searchParams.get('lesson_id');
     const memberId = searchParams.get('member_id');
 
@@ -19,12 +22,8 @@ export async function GET(request: NextRequest) {
         lesson:lessons(id, date, start_time, end_time, group_id)
       `);
 
-    if (lessonId) {
-      query = query.eq('lesson_id', lessonId);
-    }
-    if (memberId) {
-      query = query.eq('member_id', memberId);
-    }
+    if (lessonId) query = query.eq('lesson_id', lessonId);
+    if (memberId) query = query.eq('member_id', memberId);
 
     query = query.order('created_at', { ascending: false });
 
@@ -44,7 +43,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// POST /api/attendance - Save attendance (bulk upsert)
+// POST /api/attendance
 export async function POST(request: NextRequest) {
   try {
     const supabase = await createClient();
@@ -58,15 +57,20 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
-    
-    type AttendanceInsert = Database['public']['Tables']['attendance']['Insert'];
 
-    const records: AttendanceInsert[] = attendance.map((item: { member_id: string; status: 'present' | 'absent' }) => ({
-      lesson_id,
-      member_id: item.member_id,
-      status: item.status,
-    }));
+    const lessonIdStr = String(lesson_id);
 
+    // Insert tipi burada doğru şekilde oluşacak
+    const records: AttendanceInsert[] = attendance.map(
+      (item: { member_id: string; status: 'present' | 'absent' }) => ({
+        lesson_id: lessonIdStr,
+        member_id: item.member_id,
+        status: item.status,
+        notes: null, // tablo Insert tipinde zorunlu ise gereklidir
+      })
+    );
+
+    // ❗ ÖNEMLİ: Tipi burada Supabase'e bildiriyoruz
     const { data, error } = await supabase
       .from<AttendanceInsert>('attendance')
       .upsert(records, {
@@ -79,11 +83,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Also update lesson status to completed
+    // Ders durumunu tamamlandı yap
     await supabase
       .from('lessons')
       .update({ status: 'completed' })
-      .eq('id', lesson_id);
+      .eq('id', lessonIdStr);
 
     return NextResponse.json({ data, success: true });
   } catch (error) {
@@ -94,4 +98,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

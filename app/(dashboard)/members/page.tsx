@@ -52,13 +52,15 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MemberFormDialog } from '@/components/members/member-form-dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
-import { getDemoStore, DemoMember, DemoGroup } from '@/lib/demo-data';
+import { membersService } from '@/services/members.service';
+import { groupsService } from '@/services/groups.service';
 import { MemberFormValues } from '@/lib/validations/member';
+import type { MemberWithGroup, Group } from '@/types';
 import { toast } from 'sonner';
 
 export default function MembersPage() {
-  const [members, setMembers] = useState<DemoMember[]>([]);
-  const [groups, setGroups] = useState<DemoGroup[]>([]);
+  const [members, setMembers] = useState<MemberWithGroup[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -68,16 +70,64 @@ export default function MembersPage() {
   
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingMember, setEditingMember] = useState<DemoMember | null>(null);
-  const [deletingMember, setDeletingMember] = useState<DemoMember | null>(null);
+  const [editingMember, setEditingMember] = useState<MemberWithGroup | null>(null);
+  const [deletingMember, setDeletingMember] = useState<MemberWithGroup | null>(null);
   const [formLoading, setFormLoading] = useState(false);
 
+  // Load members and groups
   useEffect(() => {
-    const store = getDemoStore();
-    setMembers(store.getMembers());
-    setGroups(store.getGroups());
-    setLoading(false);
+    loadData();
   }, []);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load members
+      const membersResponse = await membersService.getAll({
+        pageSize: 1000,
+        sortBy: 'created_at',
+        sortOrder: 'desc',
+      });
+      setMembers(membersResponse.data);
+
+      // Load groups
+      const groupsResponse = await groupsService.getAll({
+        pageSize: 1000,
+      });
+      console.log('Groups loaded:', groupsResponse.data?.length || 0, 'groups');
+      setGroups(groupsResponse.data || []);
+    } catch (error: any) {
+      // Better error logging
+      console.error('Error loading data:', {
+        error,
+        message: error?.message,
+        code: error?.code,
+        details: error?.details,
+        hint: error?.hint,
+        errorString: String(error),
+        errorJSON: JSON.stringify(error, Object.getOwnPropertyNames(error)),
+      });
+      
+      // Check if it's a Supabase configuration error
+      if (error?.message?.includes('Supabase yapılandırması eksik')) {
+        toast.error(
+          'Supabase yapılandırması eksik! Lütfen .env.local dosyanıza NEXT_PUBLIC_SUPABASE_URL ve NEXT_PUBLIC_SUPABASE_ANON_KEY değerlerini ekleyin.',
+          { duration: 10000 }
+        );
+      } else if (error?.message?.includes('infinite recursion')) {
+        toast.error(
+          'RLS policy hatası! Lütfen Supabase SQL Editor\'da fix-all-issues.sql script\'ini çalıştırın.',
+          { duration: 15000 }
+        );
+      } else {
+        const errorMessage = error?.message || error?.details || error?.hint || String(error) || 'Veriler yüklenirken bir hata oluştu';
+        toast.error(errorMessage, { duration: 10000 });
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredMembers = useMemo(() => {
     return members.filter(member => {
@@ -106,67 +156,104 @@ export default function MembersPage() {
     setFormDialogOpen(true);
   };
 
-  const handleEditMember = (member: DemoMember) => {
+  const handleEditMember = (member: MemberWithGroup) => {
     setEditingMember(member);
     setFormDialogOpen(true);
   };
 
-  const handleDeleteMember = (member: DemoMember) => {
+  const handleDeleteMember = (member: MemberWithGroup) => {
     setDeletingMember(member);
     setDeleteDialogOpen(true);
   };
 
-  const handleFormSubmit = (data: MemberFormValues) => {
+  const handleFormSubmit = async (data: MemberFormValues) => {
     setFormLoading(true);
     
-    const store = getDemoStore();
-    
-    if (editingMember) {
-      store.updateMember(editingMember.id, {
-        name: data.name,
-        surname: data.surname,
-        email: data.email || null,
-        phone: data.phone || null,
-        birthdate: data.birthdate || null,
-        is_child: data.is_child,
-        parent_name: data.parent_name || null,
-        parent_phone: data.parent_phone || null,
-        group_id: data.group_id || null,
-      });
-      toast.success('Üye başarıyla güncellendi');
-    } else {
-      store.addMember({
-        name: data.name,
-        surname: data.surname,
-        email: data.email || null,
-        phone: data.phone || null,
-        birthdate: data.birthdate || null,
-        is_child: data.is_child,
-        parent_name: data.parent_name || null,
-        parent_phone: data.parent_phone || null,
-        group_id: data.group_id || null,
-        status: 'active',
-      });
-      toast.success('Üye başarıyla eklendi');
+    try {
+      if (editingMember) {
+        const response = await membersService.update(editingMember.id, {
+          name: data.name,
+          surname: data.surname,
+          email: data.email || undefined,
+          phone: data.phone || undefined,
+          birthdate: data.birthdate || undefined,
+          is_child: data.is_child,
+          parent_name: data.parent_name || undefined,
+          parent_phone: data.parent_phone || undefined,
+          group_id: data.group_id || undefined,
+        });
+        
+        if (response.success) {
+          toast.success('Üye başarıyla güncellendi');
+          await loadData();
+        } else {
+          toast.error(response.error || 'Güncelleme başarısız');
+        }
+      } else {
+        const response = await membersService.create({
+          name: data.name,
+          surname: data.surname,
+          email: data.email || undefined,
+          phone: data.phone || undefined,
+          birthdate: data.birthdate || undefined,
+          is_child: data.is_child,
+          parent_name: data.parent_name || undefined,
+          parent_phone: data.parent_phone || undefined,
+          group_id: data.group_id || undefined,
+        });
+        
+        if (response.success) {
+          toast.success('Üye başarıyla eklendi');
+          await loadData();
+        } else {
+          toast.error(response.error || 'Ekleme başarısız');
+        }
+      }
+      
+      setFormDialogOpen(false);
+      setEditingMember(null);
+    } catch (error: any) {
+      console.error('Error saving member:', error);
+      
+      // Check if it's a Supabase configuration error
+      if (error?.message?.includes('Supabase yapılandırması eksik')) {
+        toast.error(
+          'Supabase yapılandırması eksik! Dev server\'ı yeniden başlatın',
+          { 
+            duration: 15000,
+            description: 'Environment variable\'lar yüklü görünmüyor. Lütfen dev server\'ı durdurup yeniden başlatın (Ctrl+C sonra npm run dev).'
+          }
+        );
+      } else {
+        toast.error(error?.message || 'Bir hata oluştu');
+      }
+    } finally {
+      setFormLoading(false);
     }
-    
-    setMembers(store.getMembers());
-    setFormLoading(false);
-    setFormDialogOpen(false);
-    setEditingMember(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingMember) return;
     
     setFormLoading(true);
-    const store = getDemoStore();
-    store.deleteMember(deletingMember.id);
-    setMembers(store.getMembers());
-    toast.success('Üye başarıyla silindi');
-    setFormLoading(false);
-    setDeleteDialogOpen(false);
-    setDeletingMember(null);
+    
+    try {
+      const response = await membersService.delete(deletingMember.id);
+      
+      if (response.success) {
+        toast.success('Üye başarıyla silindi');
+        await loadData();
+        setDeleteDialogOpen(false);
+        setDeletingMember(null);
+      } else {
+        toast.error(response.error || 'Silme başarısız');
+      }
+    } catch (error) {
+      console.error('Error deleting member:', error);
+      toast.error('Bir hata oluştu');
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   const toggleSelectAll = () => {
@@ -191,8 +278,10 @@ export default function MembersPage() {
 
   const getGroupColor = (groupId: string | null) => {
     if (!groupId) return 'bg-gray-400';
-    const group = groups.find(g => g.id === groupId);
-    return group?.color || 'bg-gray-400';
+    // Group colors are not in the database, using default colors
+    const colors = ['bg-green-500', 'bg-blue-500', 'bg-purple-500', 'bg-yellow-500', 'bg-red-500', 'bg-emerald-500'];
+    const groupIndex = groups.findIndex(g => g.id === groupId);
+    return colors[groupIndex % colors.length] || 'bg-gray-400';
   };
 
   if (loading) {
@@ -596,8 +685,8 @@ export default function MembersPage() {
       <MemberFormDialog
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}
-        member={editingMember ? { ...editingMember, updated_at: editingMember.updated_at } : null}
-        groups={groups.map(g => ({ id: g.id, name: g.name, description: g.description, coach_id: g.coach_id, created_at: g.created_at, updated_at: g.updated_at }))}
+        member={editingMember}
+        groups={groups}
         loading={formLoading}
         onSubmit={handleFormSubmit}
       />

@@ -1,18 +1,21 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Group, GroupFormData, GroupWithMembers, ApiResponse, PaginatedResponse, FilterParams } from '@/types';
 
-const supabase = createClient();
+// Lazy initialization - client is created when first needed
+function getSupabaseClient() {
+  return createClient();
+}
 
 export const groupsService = {
   // Get all groups
   async getAll(params?: FilterParams): Promise<PaginatedResponse<GroupWithMembers>> {
     const { search, page = 1, pageSize = 20, sortBy = 'name', sortOrder = 'asc' } = params || {};
     
+    const supabase = getSupabaseClient();
     let query = supabase
       .from('groups')
       .select(`
         *,
-        coach:profiles(*),
         members(count)
       `, { count: 'exact' });
 
@@ -26,7 +29,16 @@ export const groupsService = {
 
     const { data, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('Groups service getAll error:', {
+        error,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw error;
+    }
 
     return {
       data: data as GroupWithMembers[],
@@ -39,11 +51,11 @@ export const groupsService = {
 
   // Get single group by ID
   async getById(id: string): Promise<ApiResponse<GroupWithMembers>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('groups')
       .select(`
         *,
-        coach:profiles(*),
         members(*)
       `)
       .eq('id', id)
@@ -58,6 +70,7 @@ export const groupsService = {
 
   // Create new group
   async create(groupData: GroupFormData): Promise<ApiResponse<Group>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('groups')
       .insert(groupData)
@@ -73,6 +86,7 @@ export const groupsService = {
 
   // Update group
   async update(id: string, groupData: Partial<GroupFormData>): Promise<ApiResponse<Group>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('groups')
       .update(groupData)
@@ -89,6 +103,7 @@ export const groupsService = {
 
   // Delete group
   async delete(id: string): Promise<ApiResponse<null>> {
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('groups')
       .delete()
@@ -103,6 +118,7 @@ export const groupsService = {
 
   // Add member to group
   async addMember(groupId: string, memberId: string): Promise<ApiResponse<null>> {
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('members')
       .update({ group_id: groupId })
@@ -117,6 +133,7 @@ export const groupsService = {
 
   // Remove member from group
   async removeMember(memberId: string): Promise<ApiResponse<null>> {
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('members')
       .update({ group_id: null })
@@ -131,6 +148,7 @@ export const groupsService = {
 
   // Get group lessons
   async getLessons(groupId: string): Promise<ApiResponse<any[]>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('lessons')
       .select('*')

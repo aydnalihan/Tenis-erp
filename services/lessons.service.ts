@@ -1,16 +1,20 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Lesson, LessonFormData, LessonWithAttendance, ApiResponse, FilterParams } from '@/types';
 
-const supabase = createClient();
+// Lazy initialization - client is created when first needed
+function getSupabaseClient() {
+  return createClient();
+}
 
 export const lessonsService = {
   // Get lessons for a date range
   async getByDateRange(startDate: string, endDate: string, groupId?: string): Promise<ApiResponse<Lesson[]>> {
+    const supabase = getSupabaseClient();
     let query = supabase
       .from('lessons')
       .select(`
         *,
-        group:groups(*)
+        group:groups(id, name, description, coach_id, created_at, updated_at)
       `)
       .gte('date', startDate)
       .lte('date', endDate)
@@ -32,14 +36,15 @@ export const lessonsService = {
 
   // Get single lesson with attendance
   async getById(id: string): Promise<ApiResponse<LessonWithAttendance>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('lessons')
       .select(`
         *,
-        group:groups(*),
+        group:groups(id, name, description, coach_id, created_at, updated_at),
         attendance(
           *,
-          member:members(*)
+          member:members(id, name, surname, email, phone, is_child, status)
         )
       `)
       .eq('id', id)
@@ -54,6 +59,7 @@ export const lessonsService = {
 
   // Create new lesson
   async create(lessonData: LessonFormData): Promise<ApiResponse<Lesson>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('lessons')
       .insert(lessonData)
@@ -69,6 +75,7 @@ export const lessonsService = {
 
   // Update lesson
   async update(id: string, lessonData: Partial<LessonFormData>): Promise<ApiResponse<Lesson>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('lessons')
       .update(lessonData)
@@ -85,6 +92,7 @@ export const lessonsService = {
 
   // Delete lesson
   async delete(id: string): Promise<ApiResponse<null>> {
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('lessons')
       .delete()

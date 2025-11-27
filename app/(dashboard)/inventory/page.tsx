@@ -1,6 +1,9 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { inventoryService } from '@/services/inventory.service';
+import type { InventoryItem } from '@/types';
+import { toast } from 'sonner';
 import { 
   Plus, 
   Search, 
@@ -32,33 +35,50 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 
-const inventory = [
-  { id: '1', name: 'Wilson Pro Staff Raket', category: 'Raket', quantity: 24, minStock: 10, description: 'Profesyonel tenis raketi', lastUpdated: '2024-11-20' },
-  { id: '2', name: 'Penn Championship Toplar', category: 'Top', quantity: 156, minStock: 50, description: '3lü paket tenis topu', lastUpdated: '2024-11-22' },
-  { id: '3', name: 'Tenis Filesi', category: 'Ekipman', quantity: 8, minStock: 4, description: 'Standart kort filesi', lastUpdated: '2024-11-15' },
-  { id: '4', name: 'Top Sepeti', category: 'Ekipman', quantity: 6, minStock: 4, description: '150 top kapasiteli', lastUpdated: '2024-11-10' },
-  { id: '5', name: 'Çocuk Raketi (21 inch)', category: 'Raket', quantity: 12, minStock: 8, description: '6-8 yaş için uygun', lastUpdated: '2024-11-18' },
-  { id: '6', name: 'Antrenman Konileri', category: 'Ekipman', quantity: 3, minStock: 10, description: '20li set', lastUpdated: '2024-11-01' },
-  { id: '7', name: 'Grip Bandı', category: 'Aksesuar', quantity: 45, minStock: 20, description: 'Overgrip paketi', lastUpdated: '2024-11-19' },
-];
-
-const categories = ['Tümü', 'Raket', 'Top', 'Ekipman', 'Aksesuar'];
-
 export default function InventoryPage() {
+  const [inventory, setInventory] = useState<InventoryItem[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tümü');
 
-  const lowStockItems = inventory.filter(item => item.quantity < item.minStock);
-  const totalItems = inventory.reduce((sum, item) => sum + item.quantity, 0);
+  useEffect(() => {
+    loadInventory();
+  }, []);
+
+  const loadInventory = async () => {
+    try {
+      setLoading(true);
+      const response = await inventoryService.getAll();
+      if (response.success && response.data) {
+        setInventory(response.data);
+      } else {
+        setInventory([]);
+      }
+    } catch (error: any) {
+      console.error('Error loading inventory:', error);
+      toast.error(error?.message || 'Envanter yüklenirken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Get unique categories from inventory
+  const categories = ['Tümü', ...Array.from(new Set(inventory.map(item => item.category || 'Diğer')))];
+  
+  const lowStockItems = inventory.filter(item => (item.quantity || 0) < (item.min_stock || 0));
+  const totalItems = inventory.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
   const filteredInventory = inventory.filter(item => {
-    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.description || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === 'Tümü' || item.category === selectedCategory;
     return matchesSearch && matchesCategory;
   });
 
-  const getStockStatus = (item: typeof inventory[0]) => {
-    const ratio = item.quantity / item.minStock;
+  const getStockStatus = (item: InventoryItem) => {
+    const quantity = item.quantity || 0;
+    const minStock = item.min_stock || 1;
+    const ratio = quantity / minStock;
     if (ratio < 0.5) return { label: 'Kritik', color: 'bg-red-100 text-red-700 border-0' };
     if (ratio < 1) return { label: 'Düşük', color: 'bg-amber-100 text-amber-700 border-0' };
     return { label: 'Yeterli', color: 'bg-green-100 text-green-700 border-0' };
@@ -181,104 +201,118 @@ export default function InventoryPage() {
       </Card>
 
       {/* Inventory List - Mobile Cards */}
-      <div className="block lg:hidden space-y-3">
-        {filteredInventory.map((item) => {
-          const status = getStockStatus(item);
-          return (
-            <Card key={item.id} className="bg-white border-green-100 shadow-sm">
-              <CardContent className="p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-medium text-gray-800 text-sm truncate">{item.name}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{item.description}</p>
-                    <div className="flex items-center gap-2 mt-2 flex-wrap">
-                      <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">{item.category}</Badge>
-                      <Badge className={`${status.color} text-[10px]`}>{status.label}</Badge>
+      {loading ? (
+        <div className="text-center py-12 text-gray-400">Yükleniyor...</div>
+      ) : filteredInventory.length === 0 ? (
+        <Card className="bg-white border-green-100 shadow-sm">
+          <CardContent className="py-12 text-center">
+            <p className="text-gray-400">Envanter bulunamadı</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="block lg:hidden space-y-3">
+          {filteredInventory.map((item) => {
+            const status = getStockStatus(item);
+            return (
+              <Card key={item.id} className="bg-white border-green-100 shadow-sm">
+                <CardContent className="p-4">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-gray-800 text-sm truncate">{item.name}</p>
+                      <p className="text-xs text-gray-400 mt-0.5">{item.description || 'Açıklama yok'}</p>
+                      <div className="flex items-center gap-2 mt-2 flex-wrap">
+                        <Badge className="bg-green-100 text-green-700 border-0 text-[10px]">{item.category || 'Diğer'}</Badge>
+                        <Badge className={`${status.color} text-[10px]`}>{status.label}</Badge>
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <p className="text-xl font-bold text-gray-800">{item.quantity || 0}</p>
+                      <p className="text-[10px] text-gray-400">min: {item.min_stock || 0}</p>
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-xl font-bold text-gray-800">{item.quantity}</p>
-                    <p className="text-[10px] text-gray-400">min: {item.minStock}</p>
+                  <div className="mt-3 pt-3 border-t border-green-100 flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 text-xs h-8 border-green-200 text-green-700 hover:bg-green-50">
+                      <ArrowUp className="h-3 w-3 mr-1" />
+                      Ekle
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1 text-xs h-8 border-green-200 text-amber-600 hover:bg-amber-50">
+                      <ArrowDown className="h-3 w-3 mr-1" />
+                      Çıkar
+                    </Button>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="icon" className="h-8 w-8 border-green-200">
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="border-green-100">
+                        <DropdownMenuItem className="cursor-pointer text-sm">
+                          <Edit className="h-4 w-4 mr-2 text-gray-400" />
+                          Düzenle
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-green-100" />
+                        <DropdownMenuItem className="text-red-500 hover:bg-red-50 cursor-pointer text-sm">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Sil
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
-                </div>
-                <div className="mt-3 pt-3 border-t border-green-100 flex gap-2">
-                  <Button variant="outline" size="sm" className="flex-1 text-xs h-8 border-green-200 text-green-700 hover:bg-green-50">
-                    <ArrowUp className="h-3 w-3 mr-1" />
-                    Ekle
-                  </Button>
-                  <Button variant="outline" size="sm" className="flex-1 text-xs h-8 border-green-200 text-amber-600 hover:bg-amber-50">
-                    <ArrowDown className="h-3 w-3 mr-1" />
-                    Çıkar
-                  </Button>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="outline" size="icon" className="h-8 w-8 border-green-200">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="border-green-100">
-                      <DropdownMenuItem className="cursor-pointer text-sm">
-                        <Edit className="h-4 w-4 mr-2 text-gray-400" />
-                        Düzenle
-                      </DropdownMenuItem>
-                      <DropdownMenuSeparator className="bg-green-100" />
-                      <DropdownMenuItem className="text-red-500 hover:bg-red-50 cursor-pointer text-sm">
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        Sil
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
-      </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
+      )}
 
       {/* Inventory Table - Desktop */}
-      <Card className="hidden lg:block bg-white border-green-100 shadow-sm">
-        <CardHeader className="p-4 sm:p-6">
-          <CardTitle className="text-gray-900">Envanter Listesi</CardTitle>
-          <CardDescription className="text-gray-400">
-            Tüm ekipman ve malzemelerin stok durumu
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="p-0 sm:p-6 sm:pt-0">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-green-100 hover:bg-transparent">
-                <TableHead className="text-gray-500">Ürün</TableHead>
-                <TableHead className="text-gray-500">Kategori</TableHead>
-                <TableHead className="text-center text-gray-500">Stok</TableHead>
-                <TableHead className="text-center text-gray-500">Min. Stok</TableHead>
-                <TableHead className="text-gray-500">Durum</TableHead>
-                <TableHead className="text-gray-500">Son Güncelleme</TableHead>
-                <TableHead className="w-12"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredInventory.map((item) => {
+      {!loading && (
+        <Card className="hidden lg:block bg-white border-green-100 shadow-sm">
+          <CardHeader className="p-4 sm:p-6">
+            <CardTitle className="text-gray-900">Envanter Listesi</CardTitle>
+            <CardDescription className="text-gray-400">
+              Tüm ekipman ve malzemelerin stok durumu
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 sm:p-6 sm:pt-0">
+            {filteredInventory.length === 0 ? (
+              <div className="text-center py-12 text-gray-400">Envanter bulunamadı</div>
+            ) : (
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-green-100 hover:bg-transparent">
+                    <TableHead className="text-gray-500">Ürün</TableHead>
+                    <TableHead className="text-gray-500">Kategori</TableHead>
+                    <TableHead className="text-center text-gray-500">Stok</TableHead>
+                    <TableHead className="text-center text-gray-500">Min. Stok</TableHead>
+                    <TableHead className="text-gray-500">Durum</TableHead>
+                    <TableHead className="text-gray-500">Son Güncelleme</TableHead>
+                    <TableHead className="w-12"></TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredInventory.map((item) => {
                 const status = getStockStatus(item);
                 return (
                   <TableRow key={item.id} className="border-green-50 hover:bg-green-50/50">
                     <TableCell>
                       <div>
                         <p className="font-medium text-gray-800">{item.name}</p>
-                        <p className="text-xs text-gray-400">{item.description}</p>
+                        <p className="text-xs text-gray-400">{item.description || 'Açıklama yok'}</p>
                       </div>
                     </TableCell>
                     <TableCell>
-                      <Badge className="bg-green-100 text-green-700 border-0">{item.category}</Badge>
+                      <Badge className="bg-green-100 text-green-700 border-0">{item.category || 'Diğer'}</Badge>
                     </TableCell>
                     <TableCell className="text-center">
-                      <span className="font-medium text-lg text-gray-800">{item.quantity}</span>
+                      <span className="font-medium text-lg text-gray-800">{item.quantity || 0}</span>
                     </TableCell>
-                    <TableCell className="text-center text-gray-400">{item.minStock}</TableCell>
+                    <TableCell className="text-center text-gray-400">{item.min_stock || 0}</TableCell>
                     <TableCell>
                       <Badge className={status.color}>{status.label}</Badge>
                     </TableCell>
                     <TableCell className="text-gray-400">
-                      {new Date(item.lastUpdated).toLocaleDateString('tr-TR')}
+                      {item.updated_at ? new Date(item.updated_at).toLocaleDateString('tr-TR') : '-'}
                     </TableCell>
                     <TableCell>
                       <DropdownMenu>
@@ -309,12 +343,14 @@ export default function InventoryPage() {
                       </DropdownMenu>
                     </TableCell>
                   </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
+                  );
+                  })}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </div>
   );
 }

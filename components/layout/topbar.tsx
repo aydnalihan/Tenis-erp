@@ -1,6 +1,8 @@
 'use client';
 
-import { Bell, Search, User, Command, Sparkles } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Bell, Search, User, Command, Sparkles, LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -14,12 +16,52 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { MobileSidebar } from './sidebar';
+import { createClient } from '@/lib/supabase/client';
 
 interface TopbarProps {
   title?: string;
 }
 
 export function Topbar({ title }: TopbarProps) {
+  const router = useRouter();
+  const [user, setUser] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadUser = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { user: currentUser } } = await supabase.auth.getUser();
+        setUser(currentUser);
+      } catch (error) {
+        console.error('Error loading user:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUser();
+  }, []);
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push('/login');
+      router.refresh();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force redirect even if logout fails
+      window.location.href = '/login';
+    }
+  };
+
+  const userInitials = user?.email 
+    ? user.email.substring(0, 2).toUpperCase()
+    : 'AD';
+  const userEmail = user?.email || 'admin@teniskulubu.com';
+  const userName = user?.user_metadata?.name || user?.email?.split('@')[0] || 'Admin User';
+
   return (
     <header className="sticky top-0 z-50 flex h-[72px] items-center justify-between bg-white/80 backdrop-blur-md border-b border-green-100 px-4 md:px-8">
       {/* Left Side */}
@@ -172,11 +214,11 @@ export function Topbar({ title }: TopbarProps) {
               <Avatar className="h-9 w-9 ring-2 ring-green-200">
                 <AvatarImage src="/avatars/admin.png" alt="Admin" />
                 <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white font-medium text-sm">
-                  AD
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
               <div className="hidden sm:flex flex-col items-start">
-                <span className="text-sm font-medium text-gray-800">Admin</span>
+                <span className="text-sm font-medium text-gray-800">{userName.split(' ')[0] || 'Admin'}</span>
                 <span className="text-[11px] text-gray-500">Yönetici</span>
               </div>
             </Button>
@@ -188,12 +230,12 @@ export function Topbar({ title }: TopbarProps) {
             <div className="flex items-center gap-3 p-3 rounded-lg bg-green-50 mb-2">
               <Avatar className="h-11 w-11">
                 <AvatarFallback className="bg-gradient-to-br from-green-500 to-green-600 text-white font-medium">
-                  AD
+                  {userInitials}
                 </AvatarFallback>
               </Avatar>
               <div className="flex flex-col">
-                <p className="text-sm font-medium text-gray-800">Admin User</p>
-                <p className="text-xs text-gray-500">admin@teniskulubu.com</p>
+                <p className="text-sm font-medium text-gray-800">{userName}</p>
+                <p className="text-xs text-gray-500">{userEmail}</p>
               </div>
             </div>
             
@@ -211,7 +253,11 @@ export function Topbar({ title }: TopbarProps) {
             
             <DropdownMenuSeparator className="bg-green-100 my-2" />
             
-            <DropdownMenuItem className="h-10 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 cursor-pointer">
+            <DropdownMenuItem 
+              onClick={handleLogout}
+              className="h-10 rounded-lg text-red-500 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+            >
+              <LogOut className="mr-3 h-4 w-4" />
               <span>Çıkış Yap</span>
             </DropdownMenuItem>
           </DropdownMenuContent>

@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { createClient } from '@/lib/supabase/client';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -15,6 +16,27 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [checkingAuth, setCheckingAuth] = useState(true);
+
+  // Check if user is already logged in
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const supabase = createClient();
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (session) {
+          router.push('/dashboard');
+        }
+      } catch (err) {
+        console.error('Auth check error:', err);
+      } finally {
+        setCheckingAuth(false);
+      }
+    };
+
+    checkAuth();
+  }, [router]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -22,22 +44,78 @@ export default function LoginPage() {
     setError('');
 
     try {
-      // TODO: Implement Supabase auth
-      // For demo, simulate login
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Validate Supabase configuration
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
       
-      // Demo credentials check
-      if (email === 'admin@teniskulubu.com' && password === 'admin123') {
-        router.push('/dashboard');
-      } else {
-        setError('Geçersiz e-posta veya şifre');
+      if (!supabaseUrl || !supabaseKey) {
+        setError('Supabase yapılandırması eksik! Lütfen .env.local dosyasını kontrol edin.');
+        setLoading(false);
+        return;
       }
-    } catch {
-      setError('Giriş yapılırken bir hata oluştu');
-    } finally {
+
+      const supabase = createClient();
+      
+      if (!supabase) {
+        setError('Supabase client oluşturulamadı. Lütfen tekrar deneyin.');
+        setLoading(false);
+        return;
+      }
+      
+      const { data, error: authError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password: password,
+      });
+
+      if (authError) {
+        console.error('Login error:', authError);
+        
+        // Handle specific error messages
+        if (authError.message.includes('Invalid login credentials') || 
+            authError.message.includes('invalid_credentials')) {
+          setError('Geçersiz e-posta veya şifre');
+        } else if (authError.message.includes('Email not confirmed') ||
+                   authError.message.includes('email_not_confirmed')) {
+          setError('E-posta adresiniz henüz doğrulanmamış. Lütfen e-postanızı kontrol edin.');
+        } else if (authError.message.includes('Too many requests')) {
+          setError('Çok fazla deneme yapıldı. Lütfen bir süre sonra tekrar deneyin.');
+        } else {
+          setError(authError.message || 'Giriş yapılırken bir hata oluştu');
+        }
+        setLoading(false);
+        return;
+      }
+
+      if (data?.user && data?.session) {
+        // Successfully logged in, redirect to dashboard
+        // Use window.location for a full page reload to ensure session is set
+        window.location.href = '/dashboard';
+      } else {
+        setError('Giriş başarısız. Lütfen tekrar deneyin.');
+        setLoading(false);
+      }
+    } catch (err: any) {
+      console.error('Unexpected login error:', err);
+      
+      // Handle specific error types
+      if (err?.message?.includes('Supabase yapılandırması eksik')) {
+        setError('Supabase yapılandırması eksik! Lütfen .env.local dosyasını kontrol edin ve dev server\'ı yeniden başlatın.');
+      } else if (err?.message?.includes('message port closed')) {
+        setError('Bağlantı hatası. Lütfen sayfayı yenileyip tekrar deneyin.');
+      } else {
+        setError(err?.message || 'Giriş yapılırken bir hata oluştu. Lütfen tekrar deneyin.');
+      }
       setLoading(false);
     }
   };
+
+  if (checkingAuth) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/5 via-background to-primary/10 p-4">
@@ -118,15 +196,6 @@ export default function LoginPage() {
               )}
             </Button>
           </form>
-
-          {/* Demo Credentials */}
-          <div className="mt-6 p-4 bg-muted/50 rounded-lg">
-            <p className="text-xs font-medium text-muted-foreground mb-2">Demo Bilgileri:</p>
-            <div className="text-xs space-y-1">
-              <p><span className="text-muted-foreground">E-posta:</span> admin@teniskulubu.com</p>
-              <p><span className="text-muted-foreground">Şifre:</span> admin123</p>
-            </div>
-          </div>
         </CardContent>
       </Card>
     </div>

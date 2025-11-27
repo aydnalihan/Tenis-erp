@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { cn } from '@/lib/utils';
 import {
   LayoutDashboard,
@@ -26,6 +26,7 @@ import {
   TooltipTrigger,
 } from '@/components/ui/tooltip';
 import { useState } from 'react';
+import { createClient } from '@/lib/supabase/client';
 
 const navigation = [
   {
@@ -76,7 +77,21 @@ interface SidebarProps {
 
 export function Sidebar({ className }: SidebarProps) {
   const pathname = usePathname();
+  const router = useRouter();
   const [collapsed, setCollapsed] = useState(false);
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push('/login');
+      router.refresh();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force redirect even if logout fails
+      window.location.href = '/login';
+    }
+  };
 
   return (
     <TooltipProvider delayDuration={0}>
@@ -213,6 +228,7 @@ export function Sidebar({ className }: SidebarProps) {
                   <Button
                     variant="ghost"
                     size="icon"
+                    onClick={handleLogout}
                     className="w-full h-11 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50"
                   >
                     <LogOut className="h-5 w-5" />
@@ -234,6 +250,7 @@ export function Sidebar({ className }: SidebarProps) {
               </Button>
               <Button
                 variant="ghost"
+                onClick={handleLogout}
                 className="w-full justify-start gap-3 h-11 px-4 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50"
               >
                 <LogOut className="h-5 w-5" />
@@ -267,6 +284,20 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 export function MobileSidebar() {
   const pathname = usePathname();
+  const router = useRouter();
+
+  const handleLogout = async () => {
+    try {
+      const supabase = createClient();
+      await supabase.auth.signOut();
+      router.push('/login');
+      router.refresh();
+    } catch (error) {
+      console.error('Logout error:', error);
+      // Force redirect even if logout fails
+      window.location.href = '/login';
+    }
+  };
 
   return (
     <Sheet>
@@ -356,6 +387,7 @@ export function MobileSidebar() {
             </Button>
             <Button
               variant="ghost"
+              onClick={handleLogout}
               className="w-full justify-start gap-3 h-11 px-4 rounded-xl text-red-500 hover:text-red-600 hover:bg-red-50"
             >
               <LogOut className="h-5 w-5" />

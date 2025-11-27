@@ -30,30 +30,57 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { GroupFormDialog } from '@/components/groups/group-form-dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
-import { getDemoStore, DemoGroup, DemoMember } from '@/lib/demo-data';
+import { groupsService } from '@/services/groups.service';
+import { membersService } from '@/services/members.service';
+import type { Group, GroupWithMembers, MemberWithGroup } from '@/types';
 import { GroupFormValues } from '@/lib/validations/group';
 import { toast } from 'sonner';
 
 export default function GroupsPage() {
-  const [groups, setGroups] = useState<DemoGroup[]>([]);
-  const [members, setMembers] = useState<DemoMember[]>([]);
+  const [groups, setGroups] = useState<GroupWithMembers[]>([]);
+  const [members, setMembers] = useState<MemberWithGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingGroup, setEditingGroup] = useState<DemoGroup | null>(null);
-  const [deletingGroup, setDeletingGroup] = useState<DemoGroup | null>(null);
+  const [editingGroup, setEditingGroup] = useState<GroupWithMembers | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState<GroupWithMembers | null>(null);
   const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
-    const store = getDemoStore();
-    setGroups(store.getGroups());
-    setMembers(store.getMembers());
-    setLoading(false);
+    loadData();
   }, []);
 
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load groups
+      const groupsResponse = await groupsService.getAll({
+        pageSize: 1000,
+      });
+      setGroups(groupsResponse.data || []);
+      
+      // Load members to count
+      const membersResponse = await membersService.getAll({
+        pageSize: 1000,
+      });
+      setMembers(membersResponse.data || []);
+    } catch (error: any) {
+      console.error('Error loading data:', error);
+      toast.error(error?.message || 'Veriler yüklenirken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const getMemberCount = (groupId: string) => {
+    // Use members count from group if available, otherwise count manually
+    const group = groups.find(g => g.id === groupId);
+    if (group && typeof group.members === 'object' && 'count' in group.members) {
+      return (group.members as any).count || 0;
+    }
     return members.filter(m => m.group_id === groupId).length;
   };
 
@@ -72,58 +99,80 @@ export default function GroupsPage() {
     setFormDialogOpen(true);
   };
 
-  const handleEditGroup = (group: DemoGroup) => {
+  const handleEditGroup = (group: GroupWithMembers) => {
     setEditingGroup(group);
     setFormDialogOpen(true);
   };
 
-  const handleDeleteGroup = (group: DemoGroup) => {
+  const handleDeleteGroup = (group: GroupWithMembers) => {
     setDeletingGroup(group);
     setDeleteDialogOpen(true);
   };
 
-  const handleFormSubmit = (data: GroupFormValues) => {
+  const handleFormSubmit = async (data: GroupFormValues) => {
     setFormLoading(true);
     
-    const store = getDemoStore();
-    
-    if (editingGroup) {
-      store.updateGroup(editingGroup.id, {
-        name: data.name,
-        description: data.description || null,
-        coach_id: data.coach_id || null,
-      });
-      toast.success('Grup başarıyla güncellendi');
-    } else {
-      store.addGroup({
-        name: data.name,
-        description: data.description || null,
-        coach_id: data.coach_id || null,
-        coach_name: null,
-        color: `bg-${['green', 'emerald', 'teal', 'cyan', 'blue', 'indigo'][groups.length % 6]}-500`,
-        schedule: '',
-      });
-      toast.success('Grup başarıyla oluşturuldu');
+    try {
+      if (editingGroup) {
+        const response = await groupsService.update(editingGroup.id, {
+          name: data.name,
+          description: data.description || undefined,
+          coach_id: data.coach_id || undefined,
+        });
+        
+        if (response.success) {
+          toast.success('Grup başarıyla güncellendi');
+          await loadData();
+        } else {
+          toast.error(response.error || 'Güncelleme başarısız');
+        }
+      } else {
+        const response = await groupsService.create({
+          name: data.name,
+          description: data.description || undefined,
+          coach_id: data.coach_id || undefined,
+        });
+        
+        if (response.success) {
+          toast.success('Grup başarıyla oluşturuldu');
+          await loadData();
+        } else {
+          toast.error(response.error || 'Oluşturma başarısız');
+        }
+      }
+      
+      setFormDialogOpen(false);
+      setEditingGroup(null);
+    } catch (error: any) {
+      console.error('Error saving group:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    } finally {
+      setFormLoading(false);
     }
-    
-    setGroups(store.getGroups());
-    setFormLoading(false);
-    setFormDialogOpen(false);
-    setEditingGroup(null);
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingGroup) return;
     
     setFormLoading(true);
-    const store = getDemoStore();
-    store.deleteGroup(deletingGroup.id);
-    setGroups(store.getGroups());
-    setMembers(store.getMembers());
-    toast.success('Grup başarıyla silindi');
-    setFormLoading(false);
-    setDeleteDialogOpen(false);
-    setDeletingGroup(null);
+    try {
+      const response = await groupsService.delete(deletingGroup.id);
+      
+      if (response.success) {
+        toast.success('Grup başarıyla silindi');
+        await loadData();
+      } else {
+        toast.error(response.error || 'Silme başarısız');
+      }
+      
+      setDeleteDialogOpen(false);
+      setDeletingGroup(null);
+    } catch (error: any) {
+      console.error('Error deleting group:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   if (loading) {
@@ -238,12 +287,12 @@ export default function GroupsPage() {
             const memberCount = getMemberCount(group.id);
             return (
               <Card key={group.id} className="bg-white border-green-100 shadow-sm card-hover group overflow-hidden">
-                <div className={`h-1 ${group.color}`} />
+                <div className={`h-1 bg-${['green', 'emerald', 'teal', 'cyan', 'blue', 'indigo'][groups.indexOf(group) % 6]}-500`} />
                 
                 <CardHeader className="p-3 sm:p-4 pb-2 sm:pb-3">
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-                      <div className={`w-2 sm:w-3 h-10 sm:h-12 rounded-full ${group.color} flex-shrink-0`} />
+                      <div className={`w-2 sm:w-3 h-10 sm:h-12 rounded-full bg-${['green', 'emerald', 'teal', 'cyan', 'blue', 'indigo'][groups.indexOf(group) % 6]}-500 flex-shrink-0`} />
                       <div className="min-w-0">
                         <CardTitle className="text-sm sm:text-base lg:text-lg text-gray-900 truncate">{group.name}</CardTitle>
                         <CardDescription className="line-clamp-1 text-gray-400 text-xs sm:text-sm">
@@ -295,22 +344,16 @@ export default function GroupsPage() {
                 </CardHeader>
                 <CardContent className="p-3 sm:p-4 pt-0 space-y-3 sm:space-y-4">
                   {/* Coach */}
-                  <div className="flex items-center gap-2">
-                    <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
-                      <AvatarFallback className="text-[10px] sm:text-xs bg-green-50 text-green-600">
-                        {group.coach_name ? group.coach_name.split(' ')[0][0] : '?'}
-                      </AvatarFallback>
-                    </Avatar>
-                    <span className="text-xs sm:text-sm text-gray-500 truncate">
-                      {group.coach_name || 'Antrenör atanmadı'}
-                    </span>
-                  </div>
-
-                  {/* Schedule */}
-                  {group.schedule && (
-                    <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-500">
-                      <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-gray-400 flex-shrink-0" />
-                      <span className="truncate">{group.schedule}</span>
+                  {group.coach && (
+                    <div className="flex items-center gap-2">
+                      <Avatar className="h-6 w-6 sm:h-7 sm:w-7">
+                        <AvatarFallback className="text-[10px] sm:text-xs bg-green-50 text-green-600">
+                          {group.coach?.full_name ? group.coach.full_name.split(' ')[0][0] : group.coach?.email?.[0] || '?'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <span className="text-xs sm:text-sm text-gray-500 truncate">
+                        {group.coach?.full_name || group.coach?.email || 'Antrenör atanmadı'}
+                      </span>
                     </div>
                   )}
 
@@ -362,8 +405,8 @@ export default function GroupsPage() {
         group={editingGroup ? {
           id: editingGroup.id,
           name: editingGroup.name,
-          description: editingGroup.description,
-          coach_id: editingGroup.coach_id,
+          description: editingGroup.description || undefined,
+          coach_id: editingGroup.coach_id || undefined,
           created_at: editingGroup.created_at,
           updated_at: editingGroup.updated_at,
         } : null}

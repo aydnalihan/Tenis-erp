@@ -1,18 +1,22 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Member, MemberFormData, MemberWithGroup, ApiResponse, PaginatedResponse, MemberFilterParams } from '@/types';
 
-const supabase = createClient();
+// Lazy initialization - client is created when first needed
+function getSupabaseClient() {
+  return createClient();
+}
 
 export const membersService = {
   // Get all members with optional filters
   async getAll(params?: MemberFilterParams): Promise<PaginatedResponse<MemberWithGroup>> {
-    const { search, page = 1, pageSize = 10, groupId, isChild, sortBy = 'created_at', sortOrder = 'desc' } = params || {};
+    const { search, page = 1, pageSize = 1000, groupId, isChild, status, sortBy = 'created_at', sortOrder = 'desc' } = params || {};
     
+    const supabase = getSupabaseClient();
     let query = supabase
       .from('members')
       .select(`
         *,
-        group:groups(*)
+        group:groups(id, name, description, coach_id, created_at, updated_at)
       `, { count: 'exact' });
 
     // Apply filters
@@ -25,6 +29,9 @@ export const membersService = {
     if (isChild !== undefined) {
       query = query.eq('is_child', isChild);
     }
+    if (status) {
+      query = query.eq('status', status);
+    }
 
     // Apply sorting and pagination
     query = query
@@ -33,7 +40,16 @@ export const membersService = {
 
     const { data, error, count } = await query;
 
-    if (error) throw error;
+    if (error) {
+      console.error('Members service getAll error:', {
+        error,
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint,
+      });
+      throw error;
+    }
 
     return {
       data: data as MemberWithGroup[],
@@ -46,11 +62,12 @@ export const membersService = {
 
   // Get single member by ID
   async getById(id: string): Promise<ApiResponse<MemberWithGroup>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('members')
       .select(`
         *,
-        group:groups(*)
+        group:groups(id, name, description, coach_id, created_at, updated_at)
       `)
       .eq('id', id)
       .single();
@@ -64,6 +81,7 @@ export const membersService = {
 
   // Create new member
   async create(memberData: MemberFormData): Promise<ApiResponse<Member>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('members')
       .insert(memberData)
@@ -79,6 +97,7 @@ export const membersService = {
 
   // Update member
   async update(id: string, memberData: Partial<MemberFormData>): Promise<ApiResponse<Member>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('members')
       .update(memberData)
@@ -95,6 +114,7 @@ export const membersService = {
 
   // Delete member
   async delete(id: string): Promise<ApiResponse<null>> {
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('members')
       .delete()
@@ -109,6 +129,7 @@ export const membersService = {
 
   // Get member attendance history
   async getAttendance(memberId: string): Promise<ApiResponse<any[]>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('attendance')
       .select(`
@@ -127,6 +148,7 @@ export const membersService = {
 
   // Get member payment history
   async getPayments(memberId: string): Promise<ApiResponse<any[]>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('payments')
       .select('*')
@@ -137,7 +159,7 @@ export const membersService = {
       return { data: null, error: error.message, success: false };
     }
 
-    return { data, error: null, success: true };
+    return { data: data || [], error: null, success: true };
   },
 };
 

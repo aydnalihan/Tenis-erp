@@ -13,6 +13,7 @@ export interface Member {
   parent_name: string | null;
   parent_phone: string | null;
   group_id: string | null;
+  status: 'active' | 'inactive';
   created_at: string;
   updated_at: string;
 }
@@ -234,6 +235,7 @@ export interface FilterParams {
 export interface MemberFilterParams extends FilterParams {
   groupId?: string;
   isChild?: boolean;
+  status?: 'active' | 'inactive';
 }
 
 export interface PaymentFilterParams extends FilterParams {

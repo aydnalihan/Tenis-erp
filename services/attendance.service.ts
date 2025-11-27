@@ -1,11 +1,15 @@
 import { createClient } from '@/lib/supabase/client';
 import type { Attendance, ApiResponse } from '@/types';
 
-const supabase = createClient();
+// Lazy initialization - client is created when first needed
+function getSupabaseClient() {
+  return createClient();
+}
 
 export const attendanceService = {
   // Get attendance for a lesson
   async getByLesson(lessonId: string): Promise<ApiResponse<any[]>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('attendance')
       .select(`
@@ -26,6 +30,7 @@ export const attendanceService = {
     lessonId: string, 
     attendanceData: { member_id: string; status: 'present' | 'absent' }[]
   ): Promise<ApiResponse<Attendance[]>> {
+    const supabase = getSupabaseClient();
     const records = attendanceData.map(item => ({
       lesson_id: lessonId,
       member_id: item.member_id,
@@ -53,6 +58,7 @@ export const attendanceService = {
     memberId: string, 
     status: 'present' | 'absent'
   ): Promise<ApiResponse<Attendance>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('attendance')
       .upsert({
@@ -74,6 +80,7 @@ export const attendanceService = {
 
   // Get attendance statistics for a member
   async getMemberStats(memberId: string, startDate?: string, endDate?: string): Promise<ApiResponse<any>> {
+    const supabase = getSupabaseClient();
     let query = supabase
       .from('attendance')
       .select(`
@@ -108,6 +115,7 @@ export const attendanceService = {
 
   // Get absentee list for a period
   async getAbsentees(startDate: string, endDate: string, minAbsences: number = 2): Promise<ApiResponse<any[]>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .rpc('get_absentees', {
         start_date: startDate,

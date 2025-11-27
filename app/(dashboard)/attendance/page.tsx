@@ -32,14 +32,18 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { getDemoStore, DemoLesson, DemoGroup, DemoMember, DemoAttendance } from '@/lib/demo-data';
+import { groupsService } from '@/services/groups.service';
+import { lessonsService } from '@/services/lessons.service';
+import { membersService } from '@/services/members.service';
+import { attendanceService } from '@/services/attendance.service';
+import type { Group, Lesson, MemberWithGroup, Attendance } from '@/types';
 import { toast } from 'sonner';
 
 export default function AttendancePage() {
-  const [groups, setGroups] = useState<DemoGroup[]>([]);
-  const [lessons, setLessons] = useState<DemoLesson[]>([]);
-  const [members, setMembers] = useState<DemoMember[]>([]);
-  const [existingAttendance, setExistingAttendance] = useState<DemoAttendance[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [members, setMembers] = useState<MemberWithGroup[]>([]);
+  const [existingAttendance, setExistingAttendance] = useState<Attendance[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -48,45 +52,91 @@ export default function AttendancePage() {
   const [attendance, setAttendance] = useState<Record<string, 'present' | 'absent'>>({});
 
   useEffect(() => {
-    const store = getDemoStore();
-    setGroups(store.getGroups());
-    setLessons(store.getLessons());
-    setLoading(false);
+    loadData();
   }, []);
 
-  useEffect(() => {
-    if (selectedGroupId) {
-      const store = getDemoStore();
-      const groupMembers = store.getMembersByGroup(selectedGroupId);
-      setMembers(groupMembers);
+  const loadData = async () => {
+    try {
+      setLoading(true);
       
-      const initialAttendance: Record<string, 'present' | 'absent'> = {};
-      groupMembers.forEach(m => {
-        initialAttendance[m.id] = 'present';
+      // Load groups
+      const groupsResponse = await groupsService.getAll({
+        pageSize: 1000,
       });
-      setAttendance(initialAttendance);
-      setSelectedLessonId('');
-    } else {
-      setMembers([]);
-      setAttendance({});
+      setGroups(groupsResponse.data || []);
+      
+      // Load lessons for current month
+      const now = new Date();
+      const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+      const endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+      
+      const lessonsResponse = await lessonsService.getByDateRange(startDate, endDate);
+      if (lessonsResponse.success && lessonsResponse.data) {
+        setLessons(lessonsResponse.data);
+      }
+    } catch (error: any) {
+      console.error('Error loading data:', error);
+      toast.error(error?.message || 'Veriler yüklenirken bir hata oluştu');
+    } finally {
+      setLoading(false);
     }
+  };
+
+  useEffect(() => {
+    const loadGroupMembers = async () => {
+      if (selectedGroupId) {
+        try {
+          const membersResponse = await membersService.getAll({
+            groupId: selectedGroupId,
+            pageSize: 1000,
+          });
+          const groupMembers = membersResponse.data || [];
+          setMembers(groupMembers);
+          
+          const initialAttendance: Record<string, 'present' | 'absent'> = {};
+          groupMembers.forEach(m => {
+            initialAttendance[m.id] = 'present';
+          });
+          setAttendance(initialAttendance);
+          setSelectedLessonId('');
+        } catch (error: any) {
+          console.error('Error loading group members:', error);
+          toast.error('Üyeler yüklenirken bir hata oluştu');
+        }
+      } else {
+        setMembers([]);
+        setAttendance({});
+      }
+    };
+    
+    loadGroupMembers();
   }, [selectedGroupId]);
 
   useEffect(() => {
-    if (selectedLessonId) {
-      const store = getDemoStore();
-      const existing = store.getAttendanceByLesson(selectedLessonId);
-      setExistingAttendance(existing);
-      
-      if (existing.length > 0) {
-        const attendanceMap: Record<string, 'present' | 'absent'> = {};
-        members.forEach(m => {
-          const record = existing.find(a => a.member_id === m.id);
-          attendanceMap[m.id] = record ? record.status : 'present';
-        });
-        setAttendance(attendanceMap);
+    const loadLessonAttendance = async () => {
+      if (selectedLessonId) {
+        try {
+          const attendanceResponse = await attendanceService.getByLesson(selectedLessonId);
+          if (attendanceResponse.success && attendanceResponse.data) {
+            const existing = attendanceResponse.data;
+            setExistingAttendance(existing);
+            
+            if (existing.length > 0) {
+              const attendanceMap: Record<string, 'present' | 'absent'> = {};
+              members.forEach(m => {
+                const record = existing.find((a: any) => a.member_id === m.id);
+                attendanceMap[m.id] = record ? record.status : 'present';
+              });
+              setAttendance(attendanceMap);
+            }
+          }
+        } catch (error: any) {
+          console.error('Error loading lesson attendance:', error);
+        }
       }
-    }
+    };
+    
+    loadLessonAttendance();
   }, [selectedLessonId, members]);
 
   const filteredLessons = useMemo(() => {
@@ -108,7 +158,7 @@ export default function AttendancePage() {
     setAttendance(newAttendance);
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!selectedLessonId) {
       toast.error('Lütfen bir ders seçin');
       return;
@@ -116,22 +166,36 @@ export default function AttendancePage() {
 
     setSaving(true);
     
-    const store = getDemoStore();
-    const records = Object.entries(attendance).map(([member_id, status]) => ({
-      member_id,
-      status,
-    }));
-    
-    store.saveAttendance(selectedLessonId, records);
-    setLessons(store.getLessons());
-    
-    toast.success('Yoklama başarıyla kaydedildi');
-    setSaving(false);
+    try {
+      const records = Object.entries(attendance).map(([member_id, status]) => ({
+        member_id,
+        status,
+      }));
+      
+      const response = await attendanceService.saveAttendance(selectedLessonId, records);
+      
+      if (response.success) {
+        toast.success('Yoklama başarıyla kaydedildi');
+        // Reload lesson attendance
+        const attendanceResponse = await attendanceService.getByLesson(selectedLessonId);
+        if (attendanceResponse.success && attendanceResponse.data) {
+          setExistingAttendance(attendanceResponse.data);
+        }
+        // Reload lessons to update status
+        await loadData();
+      } else {
+        toast.error(response.error || 'Yoklama kaydedilemedi');
+      }
+    } catch (error: any) {
+      console.error('Error saving attendance:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    } finally {
+      setSaving(false);
+    }
   };
 
   const recentAttendance = useMemo(() => {
-    const store = getDemoStore();
-    const allAttendance = store.getAttendance();
+    // Get recent completed lessons with attendance
     const completedLessons = lessons
       .filter(l => l.status === 'completed')
       .sort((a, b) => b.date.localeCompare(a.date))
@@ -139,19 +203,19 @@ export default function AttendancePage() {
     
     return completedLessons.map(lesson => {
       const group = groups.find(g => g.id === lesson.group_id);
-      const lessonAttendance = allAttendance.filter(a => a.lesson_id === lesson.id);
+      const lessonAttendance = existingAttendance.filter(a => a.lesson_id === lesson.id);
       const present = lessonAttendance.filter(a => a.status === 'present').length;
       const absent = lessonAttendance.filter(a => a.status === 'absent').length;
       
       return {
         date: lesson.date,
         group: group?.name || 'Bilinmiyor',
-        groupColor: group?.color || 'bg-gray-400',
+        groupColor: `bg-${['green', 'emerald', 'teal', 'cyan', 'blue', 'indigo'][groups.indexOf(group || groups[0]) % 6]}-500`,
         present,
         absent,
       };
     });
-  }, [lessons, groups]);
+  }, [lessons, groups, existingAttendance]);
 
   if (loading) {
     return (
@@ -190,10 +254,10 @@ export default function AttendancePage() {
                 <SelectValue placeholder="Grup seçin" />
               </SelectTrigger>
               <SelectContent className="border-green-100">
-                {groups.map((group) => (
+                {groups.map((group, index) => (
                   <SelectItem key={group.id} value={group.id}>
                     <div className="flex items-center gap-2">
-                      <div className={`w-2.5 h-2.5 rounded-full ${group.color}`} />
+                      <div className={`w-2.5 h-2.5 rounded-full bg-${['green', 'emerald', 'teal', 'cyan', 'blue', 'indigo'][index % 6]}-500`} />
                       {group.name}
                     </div>
                   </SelectItem>
@@ -462,38 +526,12 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groups.slice(0, 3).map((group) => {
-                  const groupMembers = getDemoStore().getMembersByGroup(group.id);
-                  if (groupMembers.length === 0) return null;
-                  const member = groupMembers[0];
-                  return (
-                    <TableRow key={member.id} className="border-green-50 hover:bg-green-50/50">
-                      <TableCell>
-                        <div className="flex items-center gap-2 sm:gap-3">
-                          <Avatar className="h-7 w-7 sm:h-9 sm:w-9">
-                            <AvatarFallback className="bg-green-50 text-green-600 text-[10px] sm:text-xs">
-                              {member.name[0]}{member.surname[0]}
-                            </AvatarFallback>
-                          </Avatar>
-                          <span className="font-medium text-gray-700 text-xs sm:text-sm">{member.name} {member.surname}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5 sm:gap-2">
-                          <div className={`w-2 h-2 rounded-full ${group.color}`} />
-                          <span className="text-gray-600 text-xs sm:text-sm">{group.name}</span>
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-center text-gray-600 text-xs sm:text-sm">12</TableCell>
-                      <TableCell className="text-center text-green-600 font-medium text-xs sm:text-sm">10</TableCell>
-                      <TableCell className="text-center">
-                        <Badge className="bg-green-100 text-green-700 border-0 text-[10px] sm:text-xs">
-                          %83
-                        </Badge>
-                      </TableCell>
-                    </TableRow>
-                  );
-                })}
+                {/* TODO: Implement absentee stats from Supabase */}
+                <TableRow className="border-green-50 hover:bg-green-50/50">
+                  <TableCell colSpan={5} className="text-center text-gray-400 text-xs sm:text-sm py-8">
+                    Devamsızlık istatistikleri yakında eklenecek
+                  </TableCell>
+                </TableRow>
               </TableBody>
             </Table>
           </div>

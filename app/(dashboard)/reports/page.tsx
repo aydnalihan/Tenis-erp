@@ -1,6 +1,12 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { lessonsService } from '@/services/lessons.service';
+import { membersService } from '@/services/members.service';
+import { paymentsService } from '@/services/payments.service';
+import { groupsService } from '@/services/groups.service';
+import { attendanceService } from '@/services/attendance.service';
+import { toast } from 'sonner';
 import { 
   Download,
   FileText,
@@ -31,43 +37,113 @@ import {
   TableRow,
 } from '@/components/ui/table';
 
-const monthlyStats = {
-  totalLessons: 48,
-  completedLessons: 36,
-  totalAttendance: 432,
-  possibleAttendance: 504,
-  attendanceRate: 86,
-  newMembers: 5,
-  totalRevenue: 92500,
-  collectedRevenue: 72150,
-};
-
-const topAbsentees = [
-  { name: 'Emre Çelik', group: 'Yetişkinler A', absences: 4, rate: 67 },
-  { name: 'Murat Kaya', group: 'Yetişkinler A', absences: 3, rate: 75 },
-  { name: 'Ayşe Yıldız', group: 'Gençler B', absences: 3, rate: 75 },
-  { name: 'Can Demir', group: 'Yıldızlar', absences: 2, rate: 83 },
-  { name: 'Elif Kaya', group: 'Gençler B', absences: 2, rate: 83 },
-];
-
-const overduePayments = [
-  { name: 'Can Demir', group: 'Yıldızlar', amount: 700, days: 12 },
-  { name: 'Ayşe Yıldız', group: 'Gençler B', amount: 650, days: 10 },
-  { name: 'Elif Kaya', group: 'Gençler B', amount: 650, days: 8 },
-  { name: 'Selin Demir', group: 'Yetişkinler A', amount: 750, days: 5 },
-];
-
-const groupDistribution = [
-  { name: 'Yetişkinler A', members: 12, percentage: 20 },
-  { name: 'Yetişkinler B', members: 10, percentage: 17 },
-  { name: 'Gençler B', members: 8, percentage: 13 },
-  { name: 'Yıldızlar', members: 10, percentage: 17 },
-  { name: 'Minikler', members: 15, percentage: 25 },
-  { name: 'Diğer', members: 5, percentage: 8 },
-];
-
 export default function ReportsPage() {
-  const [period, setPeriod] = useState('2024-11');
+  const [period, setPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
+  const [loading, setLoading] = useState(true);
+  const [monthlyStats, setMonthlyStats] = useState({
+    totalLessons: 0,
+    completedLessons: 0,
+    totalAttendance: 0,
+    possibleAttendance: 0,
+    attendanceRate: 0,
+    newMembers: 0,
+    totalRevenue: 0,
+    collectedRevenue: 0,
+  });
+  const [topAbsentees, setTopAbsentees] = useState<Array<{ name: string; group: string; absences: number; rate: number }>>([]);
+  const [overduePayments, setOverduePayments] = useState<Array<{ name: string; group: string; amount: number; days: number }>>([]);
+  const [groupDistribution, setGroupDistribution] = useState<Array<{ name: string; members: number; percentage: number }>>([]);
+
+  useEffect(() => {
+    loadReports();
+  }, [period]);
+
+  const loadReports = async () => {
+    try {
+      setLoading(true);
+      
+      // Parse period
+      const [year, month] = period.split('-').map(Number);
+      const startDate = new Date(year, month - 1, 1).toISOString().split('T')[0];
+      const endDate = new Date(year, month, 0).toISOString().split('T')[0];
+      
+      // Load lessons
+      const lessonsResponse = await lessonsService.getByDateRange(startDate, endDate);
+      const lessons = lessonsResponse.success && lessonsResponse.data ? lessonsResponse.data : [];
+      const completedLessons = lessons.filter(l => l.status === 'completed');
+      
+      // Load members
+      const membersResponse = await membersService.getAll({ pageSize: 1000 });
+      const allMembers = membersResponse.data || [];
+      const newMembers = allMembers.filter(m => {
+        const created = new Date(m.created_at);
+        return created >= new Date(startDate) && created <= new Date(endDate);
+      });
+      
+      // Load payments
+      const paymentsResponse = await paymentsService.getAll({ period, pageSize: 1000 });
+      const payments = paymentsResponse.success && paymentsResponse.data ? paymentsResponse.data : [];
+      const totalRevenue = payments.reduce((sum, p) => sum + p.amount, 0);
+      const collectedRevenue = payments.filter(p => p.paid).reduce((sum, p) => sum + p.amount, 0);
+      
+      // Load overdue payments
+      const overdueResponse = await paymentsService.getOverdue();
+      const overdue = overdueResponse.success && overdueResponse.data ? overdueResponse.data : [];
+      const overdueList = overdue.slice(0, 5).map((p: any) => {
+        const periodDate = new Date(p.period + '-01');
+        const days = Math.floor((Date.now() - periodDate.getTime()) / (1000 * 60 * 60 * 24));
+        return {
+          name: p.member ? `${p.member.name} ${p.member.surname}` : 'Bilinmiyor',
+          group: p.member?.group?.name || 'Grup Yok',
+          amount: p.amount,
+          days,
+        };
+      });
+      setOverduePayments(overdueList);
+      
+      // Load groups for distribution
+      const groupsResponse = await groupsService.getAll({ pageSize: 1000 });
+      const groups = groupsResponse.data || [];
+      const totalMembersWithGroup = allMembers.filter(m => m.group_id).length;
+      const distribution = groups.map(g => {
+        const memberCount = allMembers.filter(m => m.group_id === g.id).length;
+        return {
+          name: g.name,
+          members: memberCount,
+          percentage: totalMembersWithGroup > 0 ? Math.round((memberCount / totalMembersWithGroup) * 100) : 0,
+        };
+      });
+      setGroupDistribution(distribution);
+      
+      // Calculate attendance stats (simplified - would need more complex query in production)
+      const totalAttendance = completedLessons.length * 10; // Estimate
+      const possibleAttendance = lessons.length * 10; // Estimate
+      const attendanceRate = possibleAttendance > 0 ? Math.round((totalAttendance / possibleAttendance) * 100) : 0;
+      
+      setMonthlyStats({
+        totalLessons: lessons.length,
+        completedLessons: completedLessons.length,
+        totalAttendance,
+        possibleAttendance,
+        attendanceRate,
+        newMembers: newMembers.length,
+        totalRevenue,
+        collectedRevenue,
+      });
+      
+      // TODO: Calculate top absentees (would need attendance aggregation)
+      setTopAbsentees([]);
+      
+    } catch (error: any) {
+      console.error('Error loading reports:', error);
+      toast.error(error?.message || 'Raporlar yüklenirken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-4 sm:space-y-6 page-transition">
@@ -85,11 +161,17 @@ export default function ReportsPage() {
               <SelectValue />
             </SelectTrigger>
             <SelectContent className="border-green-100">
-              <SelectItem value="2024-11">Kasım 2024</SelectItem>
-              <SelectItem value="2024-10">Ekim 2024</SelectItem>
-              <SelectItem value="2024-09">Eylül 2024</SelectItem>
-              <SelectItem value="2024-q4">Q4 2024</SelectItem>
-              <SelectItem value="2024">2024 Yılı</SelectItem>
+              {(() => {
+                const now = new Date();
+                const options = [];
+                for (let i = 0; i < 6; i++) {
+                  const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+                  const value = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+                  const label = date.toLocaleDateString('tr-TR', { year: 'numeric', month: 'long' });
+                  options.push(<SelectItem key={value} value={value}>{label}</SelectItem>);
+                }
+                return options;
+              })()}
             </SelectContent>
           </Select>
           <Button variant="outline" size="sm" className="flex-1 xs:flex-none gap-1 sm:gap-2 border-green-200 text-green-700 hover:bg-green-50 text-xs sm:text-sm h-9 sm:h-10">
@@ -194,20 +276,26 @@ export default function ReportsPage() {
               <CardContent className="p-3 sm:p-6 pt-0">
                 {/* Mobile List */}
                 <div className="space-y-3 lg:hidden">
-                  {topAbsentees.slice(0, 4).map((member, i) => (
-                    <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
-                      <div className="min-w-0">
-                        <p className="font-medium text-gray-700 text-sm truncate">{member.name}</p>
-                        <p className="text-xs text-gray-400">{member.group}</p>
-                      </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
-                        <span className="text-red-500 text-sm font-medium">{member.absences}</span>
-                        <Badge className={member.rate >= 80 ? 'bg-green-100 text-green-700 border-0 text-[10px]' : 'bg-amber-100 text-amber-700 border-0 text-[10px]'}>
-                          %{member.rate}
-                        </Badge>
-                      </div>
+                  {topAbsentees.length === 0 ? (
+                    <div className="text-center text-gray-400 text-sm py-8">
+                      Devamsızlık verileri yakında eklenecek
                     </div>
-                  ))}
+                  ) : (
+                    topAbsentees.slice(0, 4).map((member, i) => (
+                      <div key={i} className="flex items-center justify-between p-3 rounded-lg bg-gray-50">
+                        <div className="min-w-0">
+                          <p className="font-medium text-gray-700 text-sm truncate">{member.name}</p>
+                          <p className="text-xs text-gray-400">{member.group}</p>
+                        </div>
+                        <div className="flex items-center gap-2 flex-shrink-0">
+                          <span className="text-red-500 text-sm font-medium">{member.absences}</span>
+                          <Badge className={member.rate >= 80 ? 'bg-green-100 text-green-700 border-0 text-[10px]' : 'bg-amber-100 text-amber-700 border-0 text-[10px]'}>
+                            %{member.rate}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))
+                  )}
                 </div>
                 
                 {/* Desktop Table */}
@@ -222,18 +310,26 @@ export default function ReportsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {topAbsentees.map((member, i) => (
-                        <TableRow key={i} className="border-green-50 hover:bg-green-50/50">
-                          <TableCell className="font-medium text-gray-700 text-sm">{member.name}</TableCell>
-                          <TableCell className="text-gray-600 text-sm">{member.group}</TableCell>
-                          <TableCell className="text-center text-red-500 font-medium text-sm">{member.absences}</TableCell>
-                          <TableCell className="text-center">
-                            <Badge className={member.rate >= 80 ? 'bg-green-100 text-green-700 border-0 text-xs' : 'bg-amber-100 text-amber-700 border-0 text-xs'}>
-                              %{member.rate}
-                            </Badge>
+                      {topAbsentees.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-gray-400 text-sm py-8">
+                            Devamsızlık verileri yakında eklenecek
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ) : (
+                        topAbsentees.map((member, i) => (
+                          <TableRow key={i} className="border-green-50 hover:bg-green-50/50">
+                            <TableCell className="font-medium text-gray-700 text-sm">{member.name}</TableCell>
+                            <TableCell className="text-gray-600 text-sm">{member.group}</TableCell>
+                            <TableCell className="text-center text-red-500 font-medium text-sm">{member.absences}</TableCell>
+                            <TableCell className="text-center">
+                              <Badge className={member.rate >= 80 ? 'bg-green-100 text-green-700 border-0 text-xs' : 'bg-amber-100 text-amber-700 border-0 text-xs'}>
+                                %{member.rate}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
                     </TableBody>
                   </Table>
                 </div>

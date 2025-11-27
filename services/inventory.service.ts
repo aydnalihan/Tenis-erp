@@ -1,11 +1,15 @@
 import { createClient } from '@/lib/supabase/client';
 import type { InventoryItem, InventoryFormData, ApiResponse, FilterParams } from '@/types';
 
-const supabase = createClient();
+// Lazy initialization - client is created when first needed
+function getSupabaseClient() {
+  return createClient();
+}
 
 export const inventoryService = {
   // Get all inventory items
   async getAll(params?: FilterParams): Promise<ApiResponse<InventoryItem[]>> {
+    const supabase = getSupabaseClient();
     const { search, sortBy = 'name', sortOrder = 'asc' } = params || {};
     
     let query = supabase
@@ -28,6 +32,7 @@ export const inventoryService = {
 
   // Get single item
   async getById(id: string): Promise<ApiResponse<InventoryItem>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('inventory')
       .select('*')
@@ -43,6 +48,7 @@ export const inventoryService = {
 
   // Create new item
   async create(itemData: InventoryFormData): Promise<ApiResponse<InventoryItem>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('inventory')
       .insert(itemData)
@@ -58,6 +64,7 @@ export const inventoryService = {
 
   // Update item
   async update(id: string, itemData: Partial<InventoryFormData>): Promise<ApiResponse<InventoryItem>> {
+    const supabase = getSupabaseClient();
     const { data, error } = await supabase
       .from('inventory')
       .update(itemData)
@@ -74,6 +81,7 @@ export const inventoryService = {
 
   // Delete item
   async delete(id: string): Promise<ApiResponse<null>> {
+    const supabase = getSupabaseClient();
     const { error } = await supabase
       .from('inventory')
       .delete()
@@ -88,6 +96,7 @@ export const inventoryService = {
 
   // Add stock
   async addStock(id: string, amount: number): Promise<ApiResponse<InventoryItem>> {
+    const supabase = getSupabaseClient();
     const { data: current, error: fetchError } = await supabase
       .from('inventory')
       .select('quantity')
@@ -114,6 +123,7 @@ export const inventoryService = {
 
   // Remove stock
   async removeStock(id: string, amount: number): Promise<ApiResponse<InventoryItem>> {
+    const supabase = getSupabaseClient();
     const { data: current, error: fetchError } = await supabase
       .from('inventory')
       .select('quantity')
@@ -142,13 +152,9 @@ export const inventoryService = {
 
   // Get low stock items
   async getLowStock(): Promise<ApiResponse<InventoryItem[]>> {
-    const { data, error } = await supabase
-      .from('inventory')
-      .select('*')
-      .lt('quantity', supabase.rpc('get_min_stock'))
-      .order('quantity', { ascending: true });
-
-    // Alternative approach without RPC:
+    const supabase = getSupabaseClient();
+    
+    // Get all items and filter for low stock
     const { data: allItems, error: allError } = await supabase
       .from('inventory')
       .select('*');
@@ -157,7 +163,7 @@ export const inventoryService = {
       return { data: null, error: allError.message, success: false };
     }
 
-    const lowStockItems = allItems.filter((item: any) => item.quantity < item.min_stock);
+    const lowStockItems = allItems.filter((item: any) => item.quantity < (item.min_stock || 0));
 
     return { data: lowStockItems as InventoryItem[], error: null, success: true };
   },

@@ -51,27 +51,20 @@ import {
 } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
-import { getDemoStore, DemoMember } from '@/lib/demo-data';
+import { paymentsService } from '@/services/payments.service';
+import { membersService } from '@/services/members.service';
+import type { PaymentWithMember, MemberWithGroup } from '@/types';
 import { toast } from 'sonner';
 
-interface Payment {
-  id: string;
-  member_id: string;
-  member: string;
-  group: string;
-  amount: number;
-  paid: boolean;
-  paid_at: string | null;
-  overdue?: boolean;
-  period: string;
-}
-
 export default function PaymentsPage() {
-  const [payments, setPayments] = useState<Payment[]>([]);
-  const [members, setMembers] = useState<DemoMember[]>([]);
+  const [payments, setPayments] = useState<PaymentWithMember[]>([]);
+  const [members, setMembers] = useState<MemberWithGroup[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedPeriod, setSelectedPeriod] = useState('2024-11');
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+  });
   const [filter, setFilter] = useState('all');
   
   const [addPaymentOpen, setAddPaymentOpen] = useState(false);
@@ -81,58 +74,78 @@ export default function PaymentsPage() {
   const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
-    const store = getDemoStore();
-    const allMembers = store.getMembers();
-    setMembers(allMembers);
-    
-    const demoPayments: Payment[] = allMembers.slice(0, 8).map((m, i) => {
-      const groups = store.getGroups();
-      const group = groups.find(g => g.id === m.group_id);
-      const isPaid = i < 4;
-      const isOverdue = !isPaid && i > 5;
+    loadData();
+  }, [selectedPeriod]);
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
       
-      return {
-        id: `payment-${m.id}`,
-        member_id: m.id,
-        member: `${m.name} ${m.surname}`,
-        group: group?.name || 'Grup Yok',
-        amount: 650 + (i * 50),
-        paid: isPaid,
-        paid_at: isPaid ? `2024-11-0${i + 1}` : null,
-        overdue: isOverdue,
-        period: '2024-11',
-      };
-    });
-    
-    setPayments(demoPayments);
-    setLoading(false);
-  }, []);
+      // Load payments for selected period
+      const paymentsResponse = await paymentsService.getAll({
+        period: selectedPeriod,
+        pageSize: 1000,
+      });
+      
+      if (paymentsResponse.success && paymentsResponse.data) {
+        setPayments(paymentsResponse.data);
+      } else {
+        setPayments([]);
+      }
+      
+      // Load members for add payment dialog
+      const membersResponse = await membersService.getAll({
+        pageSize: 1000,
+        status: 'active',
+      });
+      setMembers(membersResponse.data || []);
+    } catch (error: any) {
+      console.error('Error loading payments:', error);
+      toast.error(error?.message || 'Veriler yüklenirken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const totalAmount = payments.reduce((sum, p) => sum + p.amount, 0);
   const paidAmount = payments.filter(p => p.paid).reduce((sum, p) => sum + p.amount, 0);
   const pendingAmount = totalAmount - paidAmount;
-  const overdueCount = payments.filter(p => p.overdue).length;
+  const currentDate = new Date();
+  const currentPeriod = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+  const overdueCount = payments.filter(p => !p.paid && p.period < currentPeriod).length;
 
   const filteredPayments = payments.filter(p => {
-    const matchesSearch = p.member.toLowerCase().includes(searchQuery.toLowerCase());
+    const memberName = p.member ? `${p.member.name} ${p.member.surname}` : '';
+    const matchesSearch = memberName.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesPeriod = p.period === selectedPeriod;
+    
+    // Check if overdue (not paid and period is in the past)
+    const currentDate = new Date();
+    const currentPeriod = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+    const isOverdue = !p.paid && p.period < currentPeriod;
     
     if (filter === 'paid') return matchesSearch && matchesPeriod && p.paid;
     if (filter === 'pending') return matchesSearch && matchesPeriod && !p.paid;
-    if (filter === 'overdue') return matchesSearch && matchesPeriod && p.overdue;
+    if (filter === 'overdue') return matchesSearch && matchesPeriod && isOverdue;
     return matchesSearch && matchesPeriod;
   });
 
-  const handleMarkPaid = (paymentId: string) => {
-    setPayments(prev => prev.map(p => 
-      p.id === paymentId 
-        ? { ...p, paid: true, paid_at: new Date().toISOString().split('T')[0], overdue: false }
-        : p
-    ));
-    toast.success('Ödeme başarıyla kaydedildi');
+  const handleMarkPaid = async (paymentId: string) => {
+    try {
+      const response = await paymentsService.markAsPaid(paymentId);
+      if (response.success) {
+        toast.success('Ödeme başarıyla kaydedildi');
+        await loadData();
+      } else {
+        toast.error(response.error || 'Ödeme kaydedilemedi');
+      }
+    } catch (error: any) {
+      console.error('Error marking payment as paid:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    }
   };
 
-  const handleAddPayment = () => {
+  const handleAddPayment = async () => {
     if (!selectedMember) {
       toast.error('Lütfen bir üye seçin');
       return;
@@ -140,60 +153,55 @@ export default function PaymentsPage() {
     
     setFormLoading(true);
     
-    const member = members.find(m => m.id === selectedMember);
-    const store = getDemoStore();
-    const groups = store.getGroups();
-    const group = groups.find(g => g.id === member?.group_id);
-    
-    const newPayment: Payment = {
-      id: `payment-${Date.now()}`,
-      member_id: selectedMember,
-      member: member ? `${member.name} ${member.surname}` : 'Bilinmiyor',
-      group: group?.name || 'Grup Yok',
-      amount: parseInt(paymentAmount),
-      paid: true,
-      paid_at: new Date().toISOString().split('T')[0],
-      period: selectedPeriod,
-    };
-    
-    setPayments(prev => [newPayment, ...prev]);
-    
-    setTimeout(() => {
+    try {
+      const response = await paymentsService.create({
+        member_id: selectedMember,
+        period: selectedPeriod,
+        amount: parseFloat(paymentAmount),
+        paid: true,
+      });
+      
+      if (response.success) {
+        toast.success('Ödeme başarıyla eklendi');
+        await loadData();
+        setAddPaymentOpen(false);
+        setSelectedMember('');
+        setPaymentAmount('750');
+      } else {
+        toast.error(response.error || 'Ödeme eklenemedi');
+      }
+    } catch (error: any) {
+      console.error('Error adding payment:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    } finally {
       setFormLoading(false);
-      setAddPaymentOpen(false);
-      setSelectedMember('');
-      setPaymentAmount('750');
-      toast.success('Ödeme başarıyla eklendi');
-    }, 500);
+    }
   };
 
-  const handleCreatePeriod = () => {
+  const handleCreatePeriod = async () => {
     setFormLoading(true);
     
-    const store = getDemoStore();
-    const groups = store.getGroups();
-    
-    const newPayments: Payment[] = members.map(m => {
-      const group = groups.find(g => g.id === m.group_id);
-      return {
-        id: `payment-${m.id}-new`,
-        member_id: m.id,
-        member: `${m.name} ${m.surname}`,
-        group: group?.name || 'Grup Yok',
-        amount: 750,
-        paid: false,
-        paid_at: null,
-        period: '2024-12',
-      };
-    });
-    
-    setTimeout(() => {
-      setPayments(prev => [...newPayments, ...prev]);
+    try {
+      const nextMonth = new Date();
+      nextMonth.setMonth(nextMonth.getMonth() + 1);
+      const period = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+      
+      const response = await paymentsService.generatePeriod(period, parseFloat(paymentAmount));
+      
+      if (response.success) {
+        toast.success(`${period} dönemi oluşturuldu`);
+        setSelectedPeriod(period);
+        await loadData();
+        setAddPeriodOpen(false);
+      } else {
+        toast.error(response.error || 'Dönem oluşturulamadı');
+      }
+    } catch (error: any) {
+      console.error('Error creating period:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    } finally {
       setFormLoading(false);
-      setAddPeriodOpen(false);
-      setSelectedPeriod('2024-12');
-      toast.success('Aralık 2024 dönemi oluşturuldu');
-    }, 500);
+    }
   };
 
   if (loading) {
@@ -379,12 +387,16 @@ export default function PaymentsPage() {
                   <div className="flex items-center gap-3 min-w-0">
                     <Avatar className="h-9 w-9 ring-2 ring-green-100 flex-shrink-0">
                       <AvatarFallback className="text-xs bg-green-50 text-green-700">
-                        {payment.member.split(' ').map(n => n[0]).join('')}
+                        {payment.member ? `${payment.member.name?.[0] || ''}${payment.member.surname?.[0] || ''}` : '??'}
                       </AvatarFallback>
                     </Avatar>
                     <div className="min-w-0">
-                      <span className="font-medium text-gray-800 text-sm block truncate">{payment.member}</span>
-                      <span className="text-xs text-gray-500">{payment.group}</span>
+                      <span className="font-medium text-gray-800 text-sm block truncate">
+                        {payment.member ? `${payment.member.name} ${payment.member.surname}` : 'Bilinmiyor'}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {payment.member?.group?.name || 'Grup Yok'}
+                      </span>
                     </div>
                   </div>
                   <div className="text-right flex-shrink-0 ml-2">
@@ -469,10 +481,12 @@ export default function PaymentsPage() {
                       <div className="flex items-center gap-3">
                         <Avatar className="h-9 w-9 ring-2 ring-green-100">
                           <AvatarFallback className="text-xs bg-green-50 text-green-700">
-                            {payment.member.split(' ').map(n => n[0]).join('')}
+                            {payment.member ? `${payment.member.name?.[0] || ''}${payment.member.surname?.[0] || ''}` : '??'}
                           </AvatarFallback>
                         </Avatar>
-                        <span className="font-medium text-gray-800">{payment.member}</span>
+                        <span className="font-medium text-gray-800">
+                          {payment.member ? `${payment.member.name} ${payment.member.surname}` : 'Bilinmiyor'}
+                        </span>
                       </div>
                     </TableCell>
                     <TableCell className="text-gray-600">{payment.group}</TableCell>
