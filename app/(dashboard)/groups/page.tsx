@@ -405,8 +405,8 @@ export default function GroupsPage() {
         group={editingGroup ? {
           id: editingGroup.id,
           name: editingGroup.name,
-          description: editingGroup.description || undefined,
-          coach_id: editingGroup.coach_id || undefined,
+          description: editingGroup.description || null,
+          coach_id: editingGroup.coach_id || null,
           created_at: editingGroup.created_at,
           updated_at: editingGroup.updated_at,
         } : null}
