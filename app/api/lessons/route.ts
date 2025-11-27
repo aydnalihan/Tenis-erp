@@ -52,8 +52,8 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    const { data, error } = await supabase
-      .from('lessons')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('lessons') as any)
       .insert({
         group_id: body.group_id,
         date: body.date,

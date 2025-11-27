@@ -38,7 +38,17 @@ export default function DashboardPage() {
     pendingPayments: 0,
     pendingPaymentsCount: 0,
   });
-  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  type ActivityStatus = 'success' | 'warning' | 'error' | 'info';
+  type Activity = {
+    id: string;
+    type: string;
+    message: string;
+    time: string;
+    status: ActivityStatus;
+    icon: React.ComponentType<{ className?: string }>;
+    detail?: string;
+  };
+  const [recentActivities, setRecentActivities] = useState<Activity[]>([]);
   const [upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
   const [topMembers, setTopMembers] = useState<any[]>([]);
   const [attendanceRate, setAttendanceRate] = useState(0);
@@ -107,7 +117,7 @@ export default function DashboardPage() {
         sortBy: 'updated_at',
         sortOrder: 'desc',
       });
-      const recentPayments = (paymentsResponse.data || [])
+      const recentPayments: Activity[] = (paymentsResponse.data || [])
         .filter(p => p.paid && p.paid_at)
         .slice(0, 3)
         .map(p => ({
@@ -115,12 +125,12 @@ export default function DashboardPage() {
           type: 'payment',
           message: `${p.member.name} ${p.member.surname} ${p.period} aidatını ödedi`,
           time: formatDistanceToNow(new Date(p.paid_at!), { addSuffix: true, locale: tr }),
-          status: 'success',
+          status: 'success' as ActivityStatus,
           icon: CreditCard,
         }));
 
       // Load recent members for activities
-      const recentMembers = (membersResponse.data || [])
+      const recentMembers: Activity[] = (membersResponse.data || [])
         .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
         .slice(0, 1)
         .map(m => ({
@@ -128,12 +138,12 @@ export default function DashboardPage() {
           type: 'member',
           message: `Yeni üye kaydı: ${m.name} ${m.surname}`,
           time: formatDistanceToNow(new Date(m.created_at), { addSuffix: true, locale: tr }),
-          status: 'success',
+          status: 'success' as ActivityStatus,
           icon: Users,
         }));
 
       // Combine activities
-      const activities = [...recentPayments, ...recentMembers]
+      const activities: Activity[] = [...recentPayments, ...recentMembers]
         .sort((a, b) => {
           // Simple sort by time (recent first)
           return 0; // We'll keep the order as is
@@ -220,12 +230,12 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
-            {[
+            {([
               {
                 title: 'Toplam Üye',
                 value: stats.totalMembers.toString(),
                 change: '',
-                trend: 'neutral' as const,
+                trend: 'neutral' as 'up' | 'down' | 'neutral',
                 icon: Users,
                 description: 'Aktif üyeler',
               },
@@ -233,7 +243,7 @@ export default function DashboardPage() {
                 title: 'Aktif Gruplar',
                 value: stats.activeGroups.toString(),
                 change: '',
-                trend: 'neutral' as const,
+                trend: 'neutral' as 'up' | 'down' | 'neutral',
                 icon: UsersRound,
                 description: 'Toplam grup',
               },
@@ -241,7 +251,7 @@ export default function DashboardPage() {
                 title: 'Bu Ayki Dersler',
                 value: stats.monthlyLessons.toString(),
                 change: '',
-                trend: 'neutral' as const,
+                trend: 'neutral' as 'up' | 'down' | 'neutral',
                 icon: Calendar,
                 description: new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }),
               },
@@ -249,11 +259,11 @@ export default function DashboardPage() {
                 title: 'Bekleyen Ödemeler',
                 value: `₺${stats.pendingPayments.toLocaleString('tr-TR')}`,
                 change: `${stats.pendingPaymentsCount} üye`,
-                trend: stats.pendingPaymentsCount > 0 ? 'down' as const : 'neutral' as const,
+                trend: (stats.pendingPaymentsCount > 0 ? 'down' : 'neutral') as 'up' | 'down' | 'neutral',
                 icon: CreditCard,
                 description: 'Vadesi geçmiş',
               },
-            ].map((stat, index) => {
+            ]).map((stat, index) => {
               const Icon = stat.icon;
           
           return (
@@ -334,19 +344,20 @@ export default function DashboardPage() {
               <div className="space-y-2 sm:space-y-3">
                 {recentActivities.map((activity) => {
                 const Icon = activity.icon;
-                const statusClasses = {
+                const statusClasses: Record<ActivityStatus, string> = {
                   success: 'bg-green-100 text-green-600',
                   warning: 'bg-amber-100 text-amber-600',
                   error: 'bg-red-100 text-red-500',
                   info: 'bg-blue-100 text-blue-600',
-                }[activity.status];
+                };
+                const statusClass = statusClasses[activity.status];
 
                 return (
                   <div
                     key={activity.id}
                     className="flex items-start gap-3 sm:gap-4 p-3 sm:p-4 rounded-xl bg-gray-50/50 hover:bg-green-50/50 transition-all cursor-pointer group border border-transparent hover:border-green-100"
                   >
-                    <div className={`rounded-lg sm:rounded-xl p-2 sm:p-2.5 ${statusClasses} flex-shrink-0`}>
+                    <div className={`rounded-lg sm:rounded-xl p-2 sm:p-2.5 ${statusClass} flex-shrink-0`}>
                       <Icon className="h-3 w-3 sm:h-4 sm:w-4" />
                     </div>
                     <div className="flex-1 min-w-0">
@@ -548,7 +559,7 @@ export default function DashboardPage() {
                   </div>
                   <Avatar className="h-7 w-7 sm:h-8 sm:w-8">
                     <AvatarFallback className="bg-green-50 text-green-600 text-[10px] sm:text-xs">
-                      {member.name.split(' ').map(n => n[0]).join('')}
+                      {member.name.split(' ').map((n: string) => n[0]).join('')}
                     </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">

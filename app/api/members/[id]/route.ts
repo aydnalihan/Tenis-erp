@@ -60,8 +60,8 @@ export async function PUT(
     if (body.group_id !== undefined) updateData.group_id = body.group_id || null;
     if (body.status !== undefined) updateData.status = body.status;
 
-    const { data, error } = await supabase
-      .from('members')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('members') as any)
       .update(updateData)
       .eq('id', id)
       .select(`

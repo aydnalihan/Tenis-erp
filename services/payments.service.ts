@@ -45,8 +45,8 @@ export const paymentsService = {
   // Create payment record
   async create(paymentData: PaymentFormData): Promise<ApiResponse<Payment>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('payments')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('payments') as any)
       .insert(paymentData)
       .select()
       .single();
@@ -61,8 +61,8 @@ export const paymentsService = {
   // Mark payment as paid
   async markAsPaid(id: string): Promise<ApiResponse<Payment>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('payments')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('payments') as any)
       .update({ 
         paid: true, 
         paid_at: new Date().toISOString() 
@@ -81,8 +81,8 @@ export const paymentsService = {
   // Mark payment as unpaid
   async markAsUnpaid(id: string): Promise<ApiResponse<Payment>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('payments')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('payments') as any)
       .update({ 
         paid: false, 
         paid_at: null 

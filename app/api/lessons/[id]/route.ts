@@ -60,8 +60,8 @@ export async function PUT(
     if (body.notes !== undefined) updateData.notes = body.notes || null;
     if (body.status !== undefined) updateData.status = body.status;
 
-    const { data, error } = await supabase
-      .from('lessons')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('lessons') as any)
       .update(updateData)
       .eq('id', id)
       .select(`

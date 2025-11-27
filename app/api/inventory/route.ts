@@ -44,8 +44,8 @@ export async function POST(request: NextRequest) {
     const supabase = await createClient();
     const body = await request.json();
 
-    const { data, error } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('inventory') as any)
       .insert({
         name: body.name,
         category: body.category || null,

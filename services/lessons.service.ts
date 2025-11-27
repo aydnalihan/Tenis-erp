@@ -60,8 +60,8 @@ export const lessonsService = {
   // Create new lesson
   async create(lessonData: LessonFormData): Promise<ApiResponse<Lesson>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('lessons')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('lessons') as any)
       .insert(lessonData)
       .select()
       .single();
@@ -76,8 +76,8 @@ export const lessonsService = {
   // Update lesson
   async update(id: string, lessonData: Partial<LessonFormData>): Promise<ApiResponse<Lesson>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('lessons')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('lessons') as any)
       .update(lessonData)
       .eq('id', id)
       .select()

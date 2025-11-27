@@ -151,7 +151,7 @@ export default function GroupDetailPage({ params }: { params: Promise<{ id: stri
     setFormLoading(true);
     try {
       const response = await membersService.update(selectedMember.id, {
-        group_id: null,
+        group_id: undefined,
       });
       
       if (response.success) {

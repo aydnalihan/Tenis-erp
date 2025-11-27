@@ -23,7 +23,7 @@ export const memberSchema = z.object({
     .string()
     .optional()
     .or(z.literal('')),
-  is_child: z.boolean().default(false),
+  is_child: z.boolean().optional().default(false),
   parent_name: z
     .string()
     .max(100, 'Veli adı en fazla 100 karakter olabilir')

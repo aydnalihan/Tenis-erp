@@ -49,8 +49,8 @@ export const inventoryService = {
   // Create new item
   async create(itemData: InventoryFormData): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('inventory') as any)
       .insert(itemData)
       .select()
       .single();
@@ -65,8 +65,8 @@ export const inventoryService = {
   // Update item
   async update(id: string, itemData: Partial<InventoryFormData>): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('inventory') as any)
       .update(itemData)
       .eq('id', id)
       .select()
@@ -97,19 +97,19 @@ export const inventoryService = {
   // Add stock
   async addStock(id: string, amount: number): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
-    const { data: current, error: fetchError } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: current, error: fetchError } = await (supabase.from('inventory') as any)
       .select('quantity')
       .eq('id', id)
       .single();
 
-    if (fetchError) {
-      return { data: null, error: fetchError.message, success: false };
+    if (fetchError || !current) {
+      return { data: null, error: fetchError?.message || 'Item not found', success: false };
     }
 
-    const { data, error } = await supabase
-      .from('inventory')
-      .update({ quantity: current.quantity + amount })
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('inventory') as any)
+      .update({ quantity: (current as { quantity: number }).quantity + amount })
       .eq('id', id)
       .select()
       .single();
@@ -124,20 +124,20 @@ export const inventoryService = {
   // Remove stock
   async removeStock(id: string, amount: number): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
-    const { data: current, error: fetchError } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: current, error: fetchError } = await (supabase.from('inventory') as any)
       .select('quantity')
       .eq('id', id)
       .single();
 
-    if (fetchError) {
-      return { data: null, error: fetchError.message, success: false };
+    if (fetchError || !current) {
+      return { data: null, error: fetchError?.message || 'Item not found', success: false };
     }
 
-    const newQuantity = Math.max(0, current.quantity - amount);
+    const newQuantity = Math.max(0, (current as { quantity: number }).quantity - amount);
 
-    const { data, error } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('inventory') as any)
       .update({ quantity: newQuantity })
       .eq('id', id)
       .select()

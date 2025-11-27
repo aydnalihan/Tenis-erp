@@ -2,7 +2,7 @@ import { z } from 'zod';
 
 export const lessonSchema = z.object({
   group_id: z
-    .string({ required_error: 'Grup seçimi zorunludur' })
+    .string()
     .min(1, 'Lütfen bir grup seçin'),
   date: z
     .string()

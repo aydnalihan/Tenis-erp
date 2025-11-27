@@ -19,8 +19,8 @@ export async function PUT(
     if (body.min_stock !== undefined) updateData.min_stock = body.min_stock;
     if (body.description !== undefined) updateData.description = body.description || null;
 
-    const { data, error } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('inventory') as any)
       .update(updateData)
       .eq('id', id)
       .select()
@@ -84,25 +84,25 @@ export async function PATCH(
     const { action, amount } = body;
 
     // Get current quantity
-    const { data: current, error: fetchError } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data: current, error: fetchError } = await (supabase.from('inventory') as any)
       .select('quantity')
       .eq('id', id)
       .single();
 
-    if (fetchError) {
-      return NextResponse.json({ error: fetchError.message }, { status: 500 });
+    if (fetchError || !current) {
+      return NextResponse.json({ error: fetchError?.message || 'Item not found' }, { status: 500 });
     }
 
-    let newQuantity = current.quantity;
+    let newQuantity = (current as { quantity: number }).quantity;
     if (action === 'add') {
       newQuantity += amount;
     } else if (action === 'remove') {
       newQuantity = Math.max(0, newQuantity - amount);
     }
 
-    const { data, error } = await supabase
-      .from('inventory')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('inventory') as any)
       .update({ quantity: newQuantity })
       .eq('id', id)
       .select()

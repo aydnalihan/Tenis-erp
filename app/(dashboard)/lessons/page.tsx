@@ -330,7 +330,7 @@ export default function LessonsPage() {
                   {groups.map((group) => (
                     <SelectItem key={group.id} value={group.id}>
                       <div className="flex items-center gap-2">
-                        <div className={`w-2 h-2 rounded-full ${group.color}`} />
+                        <div className={`w-2 h-2 rounded-full ${groupColors[group.id] || 'bg-green-500'}`} />
                         {group.name}
                       </div>
                     </SelectItem>
@@ -711,7 +711,7 @@ export default function LessonsPage() {
           <div className="flex flex-wrap gap-3 sm:gap-4">
             {groups.map((group) => (
               <div key={group.id} className="flex items-center gap-1.5 sm:gap-2">
-                <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${group.color}`} />
+                <div className={`w-2.5 h-2.5 sm:w-3 sm:h-3 rounded-full ${groupColors[group.id] || 'bg-green-500'}`} />
                 <span className="text-xs sm:text-sm text-gray-600">{group.name}</span>
               </div>
             ))}

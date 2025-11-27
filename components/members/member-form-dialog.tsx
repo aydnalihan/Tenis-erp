@@ -53,7 +53,7 @@ export function MemberFormDialog({
 }: MemberFormDialogProps) {
   const isEditing = !!member;
 
-  const form = useForm<MemberFormValues>({
+  const form = useForm({
     resolver: zodResolver(memberSchema),
     defaultValues: {
       name: '',

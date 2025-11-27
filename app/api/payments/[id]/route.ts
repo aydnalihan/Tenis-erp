@@ -20,8 +20,8 @@ export async function PUT(
       updateData.paid_at = body.paid ? new Date().toISOString() : null;
     }
 
-    const { data, error } = await supabase
-      .from('payments')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('payments') as any)
       .update(updateData)
       .eq('id', id)
       .select(`

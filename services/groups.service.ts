@@ -71,8 +71,8 @@ export const groupsService = {
   // Create new group
   async create(groupData: GroupFormData): Promise<ApiResponse<Group>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('groups')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('groups') as any)
       .insert(groupData)
       .select()
       .single();
@@ -87,8 +87,8 @@ export const groupsService = {
   // Update group
   async update(id: string, groupData: Partial<GroupFormData>): Promise<ApiResponse<Group>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('groups')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('groups') as any)
       .update(groupData)
       .eq('id', id)
       .select()
@@ -119,8 +119,8 @@ export const groupsService = {
   // Add member to group
   async addMember(groupId: string, memberId: string): Promise<ApiResponse<null>> {
     const supabase = getSupabaseClient();
-    const { error } = await supabase
-      .from('members')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from('members') as any)
       .update({ group_id: groupId })
       .eq('id', memberId);
 
@@ -134,8 +134,8 @@ export const groupsService = {
   // Remove member from group
   async removeMember(memberId: string): Promise<ApiResponse<null>> {
     const supabase = getSupabaseClient();
-    const { error } = await supabase
-      .from('members')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error } = await (supabase.from('members') as any)
       .update({ group_id: null })
       .eq('id', memberId);
 

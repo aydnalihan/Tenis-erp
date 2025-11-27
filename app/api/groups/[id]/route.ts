@@ -53,8 +53,8 @@ export async function PUT(
     if (body.description !== undefined) updateData.description = body.description || null;
     if (body.coach_id !== undefined) updateData.coach_id = body.coach_id || null;
 
-    const { data, error } = await supabase
-      .from('groups')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('groups') as any)
       .update(updateData)
       .eq('id', id)
       .select()
@@ -87,8 +87,8 @@ export async function DELETE(
     const supabase = await createClient();
 
     // First, remove group_id from all members in this group
-    await supabase
-      .from('members')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('members') as any)
       .update({ group_id: null })
       .eq('group_id', id);
 

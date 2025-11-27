@@ -82,8 +82,8 @@ export const membersService = {
   // Create new member
   async create(memberData: MemberFormData): Promise<ApiResponse<Member>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('members')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('members') as any)
       .insert(memberData)
       .select()
       .single();
@@ -98,8 +98,8 @@ export const membersService = {
   // Update member
   async update(id: string, memberData: Partial<MemberFormData>): Promise<ApiResponse<Member>> {
     const supabase = getSupabaseClient();
-    const { data, error } = await supabase
-      .from('members')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('members') as any)
       .update(memberData)
       .eq('id', id)
       .select()

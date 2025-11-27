@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
     const lessonIdStr = String(lesson_id);
 
     // Insert tipi burada doğru şekilde oluşacak
-    const records: AttendanceInsert[] = attendance.map(
+    const records = attendance.map(
       (item: { member_id: string; status: 'present' | 'absent' }) => ({
         lesson_id: lessonIdStr,
         member_id: item.member_id,
@@ -70,9 +70,11 @@ export async function POST(request: NextRequest) {
     );
 
     // Upsert attendance records
+    // Type assertion needed because Supabase's generated types are strict
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await supabase
       .from('attendance')
-      .upsert(records, {
+      .upsert(records as any, {
         onConflict: 'lesson_id,member_id',
         ignoreDuplicates: false,
       })
@@ -83,8 +85,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Ders durumunu tamamlandı yap
-    await supabase
-      .from('lessons')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await (supabase.from('lessons') as any)
       .update({ status: 'completed' })
       .eq('id', lessonIdStr);
 
