@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
+import type { Database } from '@/lib/supabase'; // add this import
 
 // GET /api/attendance - Get attendance records
 export async function GET(request: NextRequest) {
@@ -58,21 +59,16 @@ export async function POST(request: NextRequest) {
       );
     }
     
-    type AttendanceRecord = {
-  lesson_id: string;
-  member_id: string;
-  status: 'present' | 'absent';
-};
+    type AttendanceInsert = Database['public']['Tables']['attendance']['Insert'];
 
-
-    const records: AttendanceRecord[] = attendance.map((item: { member_id: string; status: 'present' | 'absent' }) => ({
-  lesson_id,
-  member_id: item.member_id,
-  status: item.status,
-}));
+    const records: AttendanceInsert[] = attendance.map((item: { member_id: string; status: 'present' | 'absent' }) => ({
+      lesson_id,
+      member_id: item.member_id,
+      status: item.status,
+    }));
 
     const { data, error } = await supabase
-      .from('attendance')
+      .from<AttendanceInsert>('attendance')
       .upsert(records, {
         onConflict: 'lesson_id,member_id',
         ignoreDuplicates: false,
