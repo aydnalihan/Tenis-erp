@@ -61,7 +61,9 @@ export interface Payment {
 export interface InventoryItem {
   id: string;
   name: string;
+  category: string | null;
   quantity: number;
+  min_stock: number;
   description: string | null;
   created_at: string;
   updated_at: string;
@@ -160,7 +162,9 @@ export interface PaymentFormData {
 
 export interface InventoryFormData {
   name: string;
+  category?: string;
   quantity: number;
+  min_stock?: number;
   description?: string;
 }
 
