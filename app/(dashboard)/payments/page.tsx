@@ -496,7 +496,7 @@ export default function PaymentsPage() {
                         </span>
                       </div>
                     </TableCell>
-                    <TableCell className="text-gray-600">{payment.group}</TableCell>
+                    <TableCell className="text-gray-600">{payment.member?.group?.name || 'Grup Yok'}</TableCell>
                     <TableCell className="text-right font-semibold text-gray-800">₺{payment.amount}</TableCell>
                     <TableCell>
                       {payment.paid ? (
