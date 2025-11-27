@@ -1,0 +1,5 @@
+Tenis-erp Supabase url ve anon key
+
+NEXT_PUBLIC_SUPABASE_URL=https://inkxrtspktrsdxezdivh.supabase.co
+
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imlua3hydHNwa3Ryc2R4ZXpkaXZoIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQxNjg0NjAsImV4cCI6MjA3OTc0NDQ2MH0.9bL8PcSat-FruVKes7CG7Mmxy3RIJkhsfMOfvsW4g3Y

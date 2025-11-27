@@ -1,36 +1,148 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# 🎾 TenisERP - Kulüp Yönetim Sistemi
 
-## Getting Started
+Tenis kulüpleri için geliştirilmiş profesyonel ERP ve yönetim sistemi. Modern teknolojiler kullanılarak inşa edilmiştir.
 
-First, run the development server:
+## 🚀 Teknolojiler
+
+- **Framework:** Next.js 16 (App Router)
+- **Language:** TypeScript
+- **Styling:** Tailwind CSS v4
+- **UI Components:** Shadcn UI
+- **Database:** PostgreSQL (Supabase)
+- **Authentication:** Supabase Auth
+- **Form Handling:** React Hook Form + Zod
+
+## 📁 Proje Yapısı
+
+```
+tenis-erp/
+├── app/
+│   ├── (auth)/             # Auth sayfaları (login)
+│   ├── (dashboard)/        # Dashboard sayfaları
+│   │   ├── dashboard/      # Ana dashboard
+│   │   ├── members/        # Üye yönetimi
+│   │   ├── groups/         # Grup yönetimi
+│   │   ├── lessons/        # Ders yönetimi
+│   │   ├── attendance/     # Yoklama
+│   │   ├── payments/       # Ödemeler
+│   │   ├── inventory/      # Envanter
+│   │   └── reports/        # Raporlar
+│   └── api/                # API routes
+├── components/
+│   ├── layout/             # Layout bileşenleri
+│   ├── shared/             # Paylaşılan bileşenler
+│   └── ui/                 # Shadcn UI bileşenleri
+├── hooks/                  # Custom React hooks
+├── lib/
+│   ├── supabase/          # Supabase client
+│   ├── database/          # Database schema
+│   └── utils.ts           # Utility fonksiyonları
+├── services/              # API servisleri
+└── types/                 # TypeScript tipleri
+```
+
+## 🛠️ Kurulum
+
+### 1. Bağımlılıkları Yükleyin
+
+```bash
+npm install
+```
+
+### 2. Ortam Değişkenlerini Ayarlayın
+
+`.env.local` dosyası oluşturun:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=your-supabase-project-url
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+### 3. Supabase Kurulumu
+
+1. [Supabase](https://supabase.com) üzerinde yeni bir proje oluşturun
+2. `lib/database/schema.sql` dosyasındaki SQL'i Supabase SQL Editor'da çalıştırın
+3. Authentication > Providers'dan Email auth'u aktif edin
+
+### 4. Geliştirme Sunucusunu Başlatın
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Tarayıcıda [http://localhost:3000](http://localhost:3000) adresini açın.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## 📋 Modüller
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+### 👥 Üye Yönetimi
+- Üye ekleme, düzenleme, silme
+- Veli bilgileri (çocuk üyeler için)
+- Grup ataması
+- Yoklama ve ödeme geçmişi
 
-## Learn More
+### 👨‍👩‍👧‍👦 Grup Yönetimi
+- Grup oluşturma ve düzenleme
+- Üye ekleme/çıkarma
+- Antrenör ataması
+- Ders takvimi
 
-To learn more about Next.js, take a look at the following resources:
+### 📅 Ders/Etkinlik Yönetimi
+- Takvim görünümü (haftalık/aylık)
+- Ders oluşturma ve düzenleme
+- Grup bazlı planlama
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### ✅ Yoklama
+- Ders bazlı yoklama alma
+- Katılım istatistikleri
+- Devamsızlık raporları
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 💳 Ödeme Sistemi
+- Aylık aidat takibi
+- Ödeme durumu kontrolü
+- Geciken ödeme uyarıları
+- Tahsilat raporları
 
-## Deploy on Vercel
+### 📦 Envanter Takibi
+- Ekipman listesi
+- Stok yönetimi
+- Düşük stok uyarıları
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 📊 Raporlar
+- Aylık özet raporları
+- Katılım oranları
+- Ödeme istatistikleri
+- PDF/CSV export
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+## 🔐 Rol Yönetimi
+
+| Rol | Yetkiler |
+|-----|----------|
+| Admin | Tüm modüllere tam erişim |
+| Coach | Kendi grupları ve dersleri |
+
+## 🎨 Tema
+
+Yeşil-beyaz gradient renk paleti ile modern, mobil uyumlu tasarım.
+
+## 📝 Demo Bilgileri
+
+- **Email:** admin@teniskulubu.com
+- **Şifre:** admin123
+
+## 🔄 Geliştirme Aşamaları
+
+- [x] Proje iskeleti
+- [x] Renk teması
+- [x] Layout + Sidebar
+- [x] Database schema
+- [x] Temel sayfalar
+- [x] Service layer
+- [ ] API endpoints
+- [ ] Form modalleri
+- [ ] Gerçek veri entegrasyonu
+- [ ] Mobil optimizasyon
+- [ ] Test yazımı
+
+## 📄 Lisans
+
+MIT License
