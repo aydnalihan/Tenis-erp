@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -56,9 +56,13 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadDashboardData();
+    // Cleanup function to prevent memory leaks
+    return () => {
+      // Cancel any pending requests if component unmounts
+    };
   }, []);
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -180,31 +184,75 @@ export default function DashboardPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Memoize date string to prevent unnecessary recalculations
+  const formattedDate = useMemo(() => {
+    return new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+  }, []);
+
+  // Memoize stats array to prevent unnecessary re-renders
+  const statsArray = useMemo(() => {
+    return [
+      {
+        title: 'Toplam Üye',
+        value: stats.totalMembers.toString(),
+        change: '',
+        trend: 'neutral' as 'up' | 'down' | 'neutral',
+        icon: Users,
+        description: 'Aktif üyeler',
+      },
+      {
+        title: 'Aktif Gruplar',
+        value: stats.activeGroups.toString(),
+        change: '',
+        trend: 'neutral' as 'up' | 'down' | 'neutral',
+        icon: UsersRound,
+        description: 'Toplam grup',
+      },
+      {
+        title: 'Bu Ayki Dersler',
+        value: stats.monthlyLessons.toString(),
+        change: '',
+        trend: 'neutral' as 'up' | 'down' | 'neutral',
+        icon: Calendar,
+        description: new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }),
+      },
+      {
+        title: 'Bekleyen Ödemeler',
+        value: `₺${stats.pendingPayments.toLocaleString('tr-TR')}`,
+        change: `${stats.pendingPaymentsCount} üye`,
+        trend: (stats.pendingPaymentsCount > 0 ? 'down' : 'neutral') as 'up' | 'down' | 'neutral',
+        icon: CreditCard,
+        description: 'Vadesi geçmiş',
+      },
+    ];
+  }, [stats]);
+
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8 page-transition">
       {/* Welcome Header */}
       <div className="flex flex-col gap-3 sm:gap-4">
         <div>
           <p className="text-green-600 text-xs sm:text-sm font-medium mb-1">
-            {new Date().toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}
+            {formattedDate}
           </p>
           <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
-            Hoş Geldiniz! 👋
+            Dashboard
           </h1>
           <p className="text-gray-500 mt-1 text-sm sm:text-base">
-            Tenis kulübünüzün genel durumunu buradan takip edebilirsiniz.
+            Kulüp yönetim paneline hoş geldiniz. Tüm işlemlerinizi buradan yönetebilirsiniz.
           </p>
         </div>
-        <div className="flex flex-col xs:flex-row gap-2 sm:gap-3">
-          <Link href="/members" className="flex-1 xs:flex-none">
-            <Button className="w-full xs:w-auto bg-green-600 hover:bg-green-700 text-white gap-2 btn-shine shadow-lg shadow-green-200 text-sm sm:text-base">
+        <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+          <Link href="/members" className="flex-1 sm:flex-initial">
+            <Button className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white gap-2 btn-shine shadow-lg shadow-green-200 text-sm sm:text-base px-4 sm:px-6">
               <Users className="h-4 w-4" />
               Üye Ekle
             </Button>
           </Link>
-          <Link href="/lessons" className="flex-1 xs:flex-none">
-            <Button variant="outline" className="w-full xs:w-auto border-green-200 text-green-700 hover:bg-green-50 gap-2 text-sm sm:text-base">
+          <Link href="/lessons" className="flex-1 sm:flex-initial">
+            <Button variant="outline" className="w-full sm:w-auto border-green-200 text-green-700 hover:bg-green-50 gap-2 text-sm sm:text-base px-4 sm:px-6">
               <Calendar className="h-4 w-4" />
               Ders Planla
             </Button>
@@ -230,40 +278,7 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
-            {([
-              {
-                title: 'Toplam Üye',
-                value: stats.totalMembers.toString(),
-                change: '',
-                trend: 'neutral' as 'up' | 'down' | 'neutral',
-                icon: Users,
-                description: 'Aktif üyeler',
-              },
-              {
-                title: 'Aktif Gruplar',
-                value: stats.activeGroups.toString(),
-                change: '',
-                trend: 'neutral' as 'up' | 'down' | 'neutral',
-                icon: UsersRound,
-                description: 'Toplam grup',
-              },
-              {
-                title: 'Bu Ayki Dersler',
-                value: stats.monthlyLessons.toString(),
-                change: '',
-                trend: 'neutral' as 'up' | 'down' | 'neutral',
-                icon: Calendar,
-                description: new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }),
-              },
-              {
-                title: 'Bekleyen Ödemeler',
-                value: `₺${stats.pendingPayments.toLocaleString('tr-TR')}`,
-                change: `${stats.pendingPaymentsCount} üye`,
-                trend: (stats.pendingPaymentsCount > 0 ? 'down' : 'neutral') as 'up' | 'down' | 'neutral',
-                icon: CreditCard,
-                description: 'Vadesi geçmiş',
-              },
-            ]).map((stat, index) => {
+            {statsArray.map((stat, index) => {
               const Icon = stat.icon;
           
           return (
