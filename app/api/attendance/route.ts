@@ -70,9 +70,9 @@ export async function POST(request: NextRequest) {
       })
     );
 
-    // ❗ ÖNEMLİ: Tipi burada Supabase'e bildiriyoruz
+    // Upsert attendance records
     const { data, error } = await supabase
-      .from<AttendanceInsert>('attendance')
+      .from('attendance')
       .upsert(records, {
         onConflict: 'lesson_id,member_id',
         ignoreDuplicates: false,
