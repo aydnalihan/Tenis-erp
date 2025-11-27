@@ -54,6 +54,7 @@ export interface Payment {
   amount: number;
   paid: boolean;
   paid_at: string | null;
+  overdue?: boolean; // Calculated field - not in database
   created_at: string;
   updated_at: string;
 }

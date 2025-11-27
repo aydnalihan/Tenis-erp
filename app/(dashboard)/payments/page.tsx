@@ -88,7 +88,14 @@ export default function PaymentsPage() {
       });
       
       if (paymentsResponse.success && paymentsResponse.data) {
-        setPayments(paymentsResponse.data);
+        // Calculate overdue status for each payment
+        const currentDate = new Date();
+        const currentPeriod = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}`;
+        const paymentsWithOverdue = paymentsResponse.data.map(payment => ({
+          ...payment,
+          overdue: !payment.paid && payment.period < currentPeriod,
+        }));
+        setPayments(paymentsWithOverdue);
       } else {
         setPayments([]);
       }
