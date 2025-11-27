@@ -53,6 +53,7 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { paymentsService } from '@/services/payments.service';
 import { membersService } from '@/services/members.service';
+import { StatsCard } from '@/components/shared';
 import type { PaymentWithMember, MemberWithGroup } from '@/types';
 import { toast } from 'sonner';
 
@@ -256,57 +257,34 @@ export default function PaymentsPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              <span className="truncate">Toplam Beklenen</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">₺{totalAmount.toLocaleString()}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400">Kasım 2024</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <Check className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              <span className="truncate">Tahsil Edilen</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-green-600">₺{paidAmount.toLocaleString()}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400">{payments.filter(p => p.paid).length} ödeme</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
-              Bekleyen
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-amber-600">₺{pendingAmount.toLocaleString()}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400">{payments.filter(p => !p.paid).length} üye</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <AlertCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-500" />
-              Gecikmiş
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-red-500">{overdueCount}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400">üye</p>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Toplam Beklenen"
+          value={`₺${totalAmount.toLocaleString()}`}
+          subtitle="Kasım 2024"
+          icon={CreditCard}
+          index={0}
+        />
+        <StatsCard
+          title="Tahsil Edilen"
+          value={`₺${paidAmount.toLocaleString()}`}
+          subtitle={`${payments.filter(p => p.paid).length} ödeme`}
+          icon={Check}
+          index={1}
+        />
+        <StatsCard
+          title="Bekleyen"
+          value={`₺${pendingAmount.toLocaleString()}`}
+          subtitle={`${payments.filter(p => !p.paid).length} üye`}
+          icon={TrendingUp}
+          index={2}
+        />
+        <StatsCard
+          title="Gecikmiş"
+          value={overdueCount}
+          subtitle="üye"
+          icon={AlertCircle}
+          index={3}
+        />
       </div>
 
       {/* Progress Bar */}

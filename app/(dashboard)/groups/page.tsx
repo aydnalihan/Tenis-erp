@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { GroupFormDialog } from '@/components/groups/group-form-dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { StatsCard } from '@/components/shared';
 import { groupsService } from '@/services/groups.service';
 import { membersService } from '@/services/members.service';
 import type { Group, GroupWithMembers, MemberWithGroup } from '@/types';
@@ -206,43 +207,24 @@ export default function GroupsPage() {
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-3 sm:gap-4">
-        <Card className="bg-white border-green-100 shadow-sm card-hover">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">Toplam Grup</CardTitle>
-            <div className="rounded-lg p-1.5 sm:p-2 bg-green-100 hidden xs:flex">
-              <Users className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{groups.length}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-white border-green-100 shadow-sm card-hover">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">Toplam Öğrenci</CardTitle>
-            <div className="rounded-lg p-1.5 sm:p-2 bg-emerald-100 hidden xs:flex">
-              <Users className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-emerald-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-emerald-600">{totalMembers}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-white border-green-100 shadow-sm card-hover">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">Ort. Büyüklük</CardTitle>
-            <div className="rounded-lg p-1.5 sm:p-2 bg-teal-100 hidden xs:flex">
-              <Users className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-teal-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
-              {groups.length > 0 ? Math.round(totalMembers / groups.length) : 0}
-            </div>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Toplam Grup"
+          value={groups.length}
+          icon={Users}
+          index={0}
+        />
+        <StatsCard
+          title="Toplam Öğrenci"
+          value={totalMembers}
+          icon={Users}
+          index={1}
+        />
+        <StatsCard
+          title="Ort. Büyüklük"
+          value={groups.length > 0 ? Math.round(totalMembers / groups.length) : 0}
+          icon={Users}
+          index={2}
+        />
       </div>
 
       {/* Search */}

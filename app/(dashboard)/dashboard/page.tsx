@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
+import { StatsCard } from '@/components/shared';
 import { 
   Users, 
   UsersRound, 
@@ -278,54 +279,18 @@ export default function DashboardPage() {
           </>
         ) : (
           <>
-            {statsArray.map((stat, index) => {
-              const Icon = stat.icon;
-          
-          return (
-            <Card 
-              key={stat.title} 
-              className="relative overflow-hidden bg-white border-green-100 card-hover shadow-sm"
-              style={{ animationDelay: `${index * 100}ms` }}
-            >
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-400 to-green-600" />
-              
-              <CardHeader className="flex flex-row items-center justify-between p-3 sm:p-4 pb-1 sm:pb-2">
-                <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 leading-tight">
-                  {stat.title}
-                </CardTitle>
-                <div className="rounded-lg sm:rounded-xl p-1.5 sm:p-2 lg:p-2.5 bg-green-100 flex-shrink-0">
-                  <Icon className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-green-600" />
-                </div>
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 pt-0">
-                <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{stat.value}</div>
-                <div className="flex items-center gap-1 sm:gap-2 mt-1 sm:mt-2 flex-wrap">
-                  {stat.trend === 'up' && (
-                    <div className="flex items-center gap-0.5 sm:gap-1 text-green-600">
-                      <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="text-[10px] sm:text-xs font-medium">{stat.change}</span>
-                    </div>
-                  )}
-                  {stat.trend === 'down' && (
-                    <div className="flex items-center gap-0.5 sm:gap-1 text-amber-600">
-                      <TrendingDown className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="text-[10px] sm:text-xs font-medium">{stat.change}</span>
-                    </div>
-                  )}
-                  {stat.trend === 'neutral' && (
-                    <div className="flex items-center gap-0.5 sm:gap-1 text-gray-500">
-                      <Clock className="h-3 w-3 sm:h-4 sm:w-4" />
-                      <span className="text-[10px] sm:text-xs font-medium">{stat.change}</span>
-                    </div>
-                  )}
-                  <span className="text-[10px] sm:text-xs text-gray-400 hidden sm:inline">
-                    {stat.description}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          );
-        })}
+            {statsArray.map((stat, index) => (
+              <StatsCard
+                key={stat.title}
+                title={stat.title}
+                value={stat.value}
+                subtitle={stat.description}
+                icon={stat.icon}
+                trend={stat.trend}
+                change={stat.change || undefined}
+                index={index}
+              />
+            ))}
           </>
         )}
       </div>

@@ -34,6 +34,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { StatsCard } from '@/components/shared';
 
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
@@ -102,51 +103,30 @@ export default function InventoryPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <Package className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              <span className="truncate">Ürün Tipi</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{inventory.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">
-              <span className="truncate">Toplam Stok</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{totalItems}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-amber-500" />
-              <span className="truncate">Düşük Stok</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-amber-600">{lowStockItems.length}</div>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">
-              Kategoriler
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{categories.length - 1}</div>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Ürün Tipi"
+          value={inventory.length}
+          icon={Package}
+          index={0}
+        />
+        <StatsCard
+          title="Toplam Stok"
+          value={totalItems}
+          icon={Package}
+          index={1}
+        />
+        <StatsCard
+          title="Düşük Stok"
+          value={lowStockItems.length}
+          icon={AlertTriangle}
+          index={2}
+        />
+        <StatsCard
+          title="Kategoriler"
+          value={categories.length - 1}
+          icon={Package}
+          index={3}
+        />
       </div>
 
       {/* Low Stock Alert */}

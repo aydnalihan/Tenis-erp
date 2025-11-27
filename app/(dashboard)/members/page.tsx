@@ -52,6 +52,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MemberFormDialog } from '@/components/members/member-form-dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
+import { StatsCard } from '@/components/shared';
 import { membersService } from '@/services/members.service';
 import { groupsService } from '@/services/groups.service';
 import { MemberFormValues } from '@/lib/validations/member';
@@ -317,53 +318,30 @@ export default function MembersPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-white border-green-100 shadow-sm card-hover">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">Toplam Üye</CardTitle>
-            <div className="rounded-lg p-1.5 sm:p-2 bg-green-100">
-              <Users className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-green-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{stats.total}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-white border-green-100 shadow-sm card-hover">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">Aktif Üye</CardTitle>
-            <div className="rounded-lg p-1.5 sm:p-2 bg-emerald-100">
-              <UserCheck className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-emerald-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-emerald-600">{stats.active}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-white border-green-100 shadow-sm card-hover">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">Çocuk Üye</CardTitle>
-            <div className="rounded-lg p-1.5 sm:p-2 bg-teal-100">
-              <Baby className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-teal-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{stats.children}</div>
-          </CardContent>
-        </Card>
-        
-        <Card className="bg-white border-green-100 shadow-sm card-hover">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2 flex flex-row items-center justify-between">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500">Yetişkin Üye</CardTitle>
-            <div className="rounded-lg p-1.5 sm:p-2 bg-blue-100">
-              <User className="h-3 w-3 sm:h-4 sm:w-4 lg:h-5 lg:w-5 text-blue-600" />
-            </div>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{stats.adults}</div>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Toplam Üye"
+          value={stats.total}
+          icon={Users}
+          index={0}
+        />
+        <StatsCard
+          title="Aktif Üye"
+          value={stats.active}
+          icon={UserCheck}
+          index={1}
+        />
+        <StatsCard
+          title="Çocuk Üye"
+          value={stats.children}
+          icon={Baby}
+          index={2}
+        />
+        <StatsCard
+          title="Yetişkin Üye"
+          value={stats.adults}
+          icon={User}
+          index={3}
+        />
       </div>
 
       {/* Filters */}

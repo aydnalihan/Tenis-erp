@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { StatsCard } from '@/components/shared';
 import {
   Table,
   TableBody,
@@ -187,61 +188,34 @@ export default function ReportsPage() {
 
       {/* Summary Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              <span className="truncate">Toplam Ders</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">{monthlyStats.totalLessons}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400">{monthlyStats.completedLessons} tamamlandı</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              <span className="truncate">Katılım Oranı</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-green-600">%{monthlyStats.attendanceRate}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400">{monthlyStats.totalAttendance}/{monthlyStats.possibleAttendance}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <Users className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              <span className="truncate">Yeni Üye</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-emerald-600">+{monthlyStats.newMembers}</div>
-            <p className="text-[10px] sm:text-xs text-gray-400">Bu ay</p>
-          </CardContent>
-        </Card>
-
-        <Card className="bg-white border-green-100 shadow-sm">
-          <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
-            <CardTitle className="text-[10px] sm:text-xs lg:text-sm font-medium text-gray-500 flex items-center gap-1 sm:gap-2">
-              <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 text-green-600" />
-              <span className="truncate">Tahsilat</span>
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-3 sm:p-4 pt-0">
-            <div className="text-2xl sm:text-3xl lg:text-4xl font-bold text-gray-900">
-              %{Math.round((monthlyStats.collectedRevenue / monthlyStats.totalRevenue) * 100)}
-            </div>
-            <p className="text-[10px] sm:text-xs text-gray-400 truncate">
-              ₺{(monthlyStats.collectedRevenue / 1000).toFixed(0)}K / ₺{(monthlyStats.totalRevenue / 1000).toFixed(0)}K
-            </p>
-          </CardContent>
-        </Card>
+        <StatsCard
+          title="Toplam Ders"
+          value={monthlyStats.totalLessons}
+          subtitle={`${monthlyStats.completedLessons} tamamlandı`}
+          icon={Calendar}
+          index={0}
+        />
+        <StatsCard
+          title="Katılım Oranı"
+          value={`%${monthlyStats.attendanceRate}`}
+          subtitle={`${monthlyStats.totalAttendance}/${monthlyStats.possibleAttendance}`}
+          icon={TrendingUp}
+          index={1}
+        />
+        <StatsCard
+          title="Yeni Üye"
+          value={`+${monthlyStats.newMembers}`}
+          subtitle="Bu ay"
+          icon={Users}
+          index={2}
+        />
+        <StatsCard
+          title="Tahsilat"
+          value={`%${Math.round((monthlyStats.collectedRevenue / monthlyStats.totalRevenue) * 100)}`}
+          subtitle={`₺${(monthlyStats.collectedRevenue / 1000).toFixed(0)}K / ₺${(monthlyStats.totalRevenue / 1000).toFixed(0)}K`}
+          icon={CreditCard}
+          index={3}
+        />
       </div>
 
       {/* Tabs for detailed reports */}
