@@ -57,12 +57,19 @@ export async function POST(request: NextRequest) {
         { status: 400 }
       );
     }
+    
+    type AttendanceRecord = {
+  lesson_id: string;
+  member_id: string;
+  status: 'present' | 'absent';
+};
 
-    const records = attendance.map((item: { member_id: string; status: 'present' | 'absent' }) => ({
-      lesson_id,
-      member_id: item.member_id,
-      status: item.status,
-    }));
+
+    const records: AttendanceRecord[] = attendance.map((item: { member_id: string; status: 'present' | 'absent' }) => ({
+  lesson_id,
+  member_id: item.member_id,
+  status: item.status,
+}));
 
     const { data, error } = await supabase
       .from('attendance')
