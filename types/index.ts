@@ -120,7 +120,7 @@ export interface AttendanceWithLesson extends Attendance {
 }
 
 export interface PaymentWithMember extends Payment {
-  member: Member;
+  member: MemberWithGroup;
 }
 
 // ============================
