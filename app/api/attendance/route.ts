@@ -72,7 +72,7 @@ export async function POST(request: NextRequest) {
     // Upsert attendance records
     const { data, error } = await supabase
       .from('attendance')
-      .upsert(records as any, {
+      .upsert(records, {
         onConflict: 'lesson_id,member_id',
         ignoreDuplicates: false,
       })

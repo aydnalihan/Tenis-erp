@@ -152,6 +152,7 @@ export interface LessonFormData {
   start_time: string;
   end_time: string;
   notes?: string;
+  status?: 'scheduled' | 'completed' | 'cancelled';
 }
 
 export interface PaymentFormData {

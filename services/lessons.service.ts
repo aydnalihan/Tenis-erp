@@ -107,12 +107,12 @@ export const lessonsService = {
 
   // Complete lesson
   async complete(id: string): Promise<ApiResponse<Lesson>> {
-    return this.update(id, { status: 'completed' } as any);
+    return this.update(id, { status: 'completed' });
   },
 
   // Cancel lesson
   async cancel(id: string): Promise<ApiResponse<Lesson>> {
-    return this.update(id, { status: 'cancelled' } as any);
+    return this.update(id, { status: 'cancelled' });
   },
 };
 

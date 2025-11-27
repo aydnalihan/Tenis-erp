@@ -111,7 +111,6 @@ export type Database = {
           lesson_id: string;
           member_id: string;
           status: 'present' | 'absent';
-          notes: string | null;
           created_at: string;
         };
         Insert: Omit<Database['public']['Tables']['attendance']['Row'], 'id' | 'created_at'> & {
@@ -126,7 +125,7 @@ export type Database = {
           member_id: string;
           amount: number;
           period: string;
-          status: 'pending' | 'paid' | 'overdue';
+          paid: boolean;
           paid_at: string | null;
           notes: string | null;
           created_at: string;
@@ -144,7 +143,7 @@ export type Database = {
           id: string;
           name: string;
           description: string | null;
-          category: string;
+          category: string | null;
           quantity: number;
           min_stock: number;
           created_at: string;
@@ -185,7 +184,6 @@ export type Database = {
       member_status: 'active' | 'inactive';
       lesson_status: 'scheduled' | 'completed' | 'cancelled';
       attendance_status: 'present' | 'absent';
-      payment_status: 'pending' | 'paid' | 'overdue';
     };
   };
 };

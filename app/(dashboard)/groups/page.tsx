@@ -76,11 +76,7 @@ export default function GroupsPage() {
   };
 
   const getMemberCount = (groupId: string) => {
-    // Use members count from group if available, otherwise count manually
-    const group = groups.find(g => g.id === groupId);
-    if (group && typeof group.members === 'object' && 'count' in group.members) {
-      return (group.members as any).count || 0;
-    }
+    // Count members for this group from the members array
     return members.filter(m => m.group_id === groupId).length;
   };
 

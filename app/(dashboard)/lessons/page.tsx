@@ -36,7 +36,9 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { LessonFormDialog } from '@/components/lessons/lesson-form-dialog';
 import { ConfirmDialog } from '@/components/shared/confirm-dialog';
-import { getDemoStore, DemoLesson, DemoGroup } from '@/lib/demo-data';
+import { lessonsService } from '@/services/lessons.service';
+import { groupsService } from '@/services/groups.service';
+import type { Lesson, Group } from '@/types';
 import { LessonFormValues } from '@/lib/validations/lesson';
 import { toast } from 'sonner';
 
@@ -44,8 +46,8 @@ const weekDays = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 const weekDaysFull = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
 
 export default function LessonsPage() {
-  const [lessons, setLessons] = useState<DemoLesson[]>([]);
-  const [groups, setGroups] = useState<DemoGroup[]>([]);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [groups, setGroups] = useState<Group[]>([]);
   const [loading, setLoading] = useState(true);
   
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -55,22 +57,68 @@ export default function LessonsPage() {
   
   const [formDialogOpen, setFormDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [editingLesson, setEditingLesson] = useState<DemoLesson | null>(null);
-  const [deletingLesson, setDeletingLesson] = useState<DemoLesson | null>(null);
+  const [editingLesson, setEditingLesson] = useState<Lesson | null>(null);
+  const [deletingLesson, setDeletingLesson] = useState<Lesson | null>(null);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
-    const store = getDemoStore();
-    setLessons(store.getLessons());
-    setGroups(store.getGroups());
-    setLoading(false);
+    loadData();
   }, []);
 
+  // Reload lessons when week changes
+  useEffect(() => {
+    loadLessonsForWeek();
+  }, [currentDate]);
+
+  const loadLessonsForWeek = async () => {
+    try {
+      const weekStart = getWeekDates()[0];
+      const weekEnd = getWeekDates()[6];
+      const startDate = weekStart.toISOString().split('T')[0];
+      const endDate = weekEnd.toISOString().split('T')[0];
+      
+      const lessonsResponse = await lessonsService.getByDateRange(startDate, endDate);
+      if (lessonsResponse.success && lessonsResponse.data) {
+        setLessons(lessonsResponse.data);
+      }
+    } catch (error: any) {
+      console.error('Error loading lessons for week:', error);
+    }
+  };
+
+  const loadData = async () => {
+    try {
+      setLoading(true);
+      
+      // Load groups
+      const groupsResponse = await groupsService.getAll({ pageSize: 1000 });
+      setGroups(groupsResponse.data || []);
+      
+      // Load lessons for current week
+      const weekStart = getWeekDates()[0];
+      const weekEnd = getWeekDates()[6];
+      const startDate = weekStart.toISOString().split('T')[0];
+      const endDate = weekEnd.toISOString().split('T')[0];
+      
+      const lessonsResponse = await lessonsService.getByDateRange(startDate, endDate);
+      if (lessonsResponse.success && lessonsResponse.data) {
+        setLessons(lessonsResponse.data);
+      }
+    } catch (error: any) {
+      console.error('Error loading lessons:', error);
+      toast.error(error?.message || 'Veriler yüklenirken bir hata oluştu');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Generate colors for groups (since we don't have color in database)
   const groupColors = useMemo(() => {
     const colors: Record<string, string> = {};
-    groups.forEach(g => {
-      colors[g.id] = g.color;
+    const colorPalette = ['bg-green-500', 'bg-emerald-500', 'bg-teal-500', 'bg-cyan-500', 'bg-blue-500', 'bg-indigo-500'];
+    groups.forEach((g, index) => {
+      colors[g.id] = colorPalette[index % colorPalette.length];
     });
     return colors;
   }, [groups]);
@@ -103,7 +151,7 @@ export default function LessonsPage() {
 
   // Get all lessons for current week (for mobile list view)
   const weekLessons = useMemo(() => {
-    const allLessons: { date: Date; lessons: DemoLesson[] }[] = [];
+    const allLessons: { date: Date; lessons: Lesson[] }[] = [];
     weekDates.forEach(date => {
       const dayLessons = getLessonsForDate(date);
       if (dayLessons.length > 0) {
@@ -131,61 +179,85 @@ export default function LessonsPage() {
     setFormDialogOpen(true);
   };
 
-  const handleEditLesson = (lesson: DemoLesson) => {
+  const handleEditLesson = (lesson: Lesson) => {
     setEditingLesson(lesson);
     setSelectedDate(null);
     setFormDialogOpen(true);
   };
 
-  const handleDeleteLesson = (lesson: DemoLesson) => {
+  const handleDeleteLesson = (lesson: Lesson) => {
     setDeletingLesson(lesson);
     setDeleteDialogOpen(true);
   };
 
-  const handleFormSubmit = (data: LessonFormValues) => {
+  const handleFormSubmit = async (data: LessonFormValues) => {
     setFormLoading(true);
     
-    const store = getDemoStore();
-    
-    if (editingLesson) {
-      store.updateLesson(editingLesson.id, {
-        group_id: data.group_id,
-        date: data.date,
-        start_time: data.start_time,
-        end_time: data.end_time,
-        notes: data.notes || null,
-      });
-      toast.success('Ders başarıyla güncellendi');
+    try {
+      if (editingLesson) {
+        const response = await lessonsService.update(editingLesson.id, {
+          group_id: data.group_id,
+          date: data.date,
+          start_time: data.start_time,
+          end_time: data.end_time,
+          notes: data.notes || undefined,
+        });
+        
+        if (response.success) {
+          toast.success('Ders başarıyla güncellendi');
+          await loadData();
+          setFormDialogOpen(false);
+        } else {
+          toast.error(response.error || 'Güncelleme başarısız');
+        }
     } else {
-      store.addLesson({
+      const response = await lessonsService.create({
         group_id: data.group_id,
         date: data.date,
         start_time: data.start_time,
         end_time: data.end_time,
-        notes: data.notes || null,
-        status: 'scheduled',
+        notes: data.notes || undefined,
       });
-      toast.success('Ders başarıyla eklendi');
+      
+      if (response.success) {
+        toast.success('Ders başarıyla eklendi');
+        await loadData();
+        setFormDialogOpen(false);
+        setEditingLesson(null);
+        setSelectedDate(null);
+      } else {
+        toast.error(response.error || 'Ekleme başarısız');
+      }
     }
-    
-    setLessons(store.getLessons());
-    setFormLoading(false);
-    setFormDialogOpen(false);
-    setEditingLesson(null);
-    setSelectedDate(null);
+    } catch (error: any) {
+      console.error('Error saving lesson:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    } finally {
+      setFormLoading(false);
+    }
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (!deletingLesson) return;
     
     setFormLoading(true);
-    const store = getDemoStore();
-    store.deleteLesson(deletingLesson.id);
-    setLessons(store.getLessons());
-    toast.success('Ders başarıyla silindi');
-    setFormLoading(false);
-    setDeleteDialogOpen(false);
-    setDeletingLesson(null);
+    try {
+      const response = await lessonsService.delete(deletingLesson.id);
+      
+      if (response.success) {
+        toast.success('Ders başarıyla silindi');
+        await loadData();
+        setDeleteDialogOpen(false);
+        setDeletingLesson(null);
+      } else {
+        toast.error(response.error || 'Silme başarısız');
+      }
+    } catch (error: any) {
+      console.error('Error deleting lesson:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    } finally {
+      setFormLoading(false);
+    }
   };
 
   if (loading) {
@@ -650,7 +722,7 @@ export default function LessonsPage() {
       <LessonFormDialog
         open={formDialogOpen}
         onOpenChange={setFormDialogOpen}
-        lesson={editingLesson as any}
+        lesson={editingLesson}
         groups={groups.map(g => ({
           id: g.id,
           name: g.name,

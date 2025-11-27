@@ -1,9 +1,11 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { 
   Users, 
   UsersRound, 
@@ -19,105 +21,156 @@ import {
   ChevronRight
 } from 'lucide-react';
 import Link from 'next/link';
-
-// Demo data
-const stats = [
-  {
-    title: 'Toplam Üye',
-    value: '124',
-    change: '+12%',
-    trend: 'up',
-    icon: Users,
-    description: 'Son 30 gün',
-  },
-  {
-    title: 'Aktif Gruplar',
-    value: '8',
-    change: '+2',
-    trend: 'up',
-    icon: UsersRound,
-    description: 'Bu ay',
-  },
-  {
-    title: 'Bu Ayki Dersler',
-    value: '48',
-    change: '12 kalan',
-    trend: 'neutral',
-    icon: Calendar,
-    description: 'Kasım 2024',
-  },
-  {
-    title: 'Bekleyen Ödemeler',
-    value: '₺12,450',
-    change: '18 üye',
-    trend: 'down',
-    icon: CreditCard,
-    description: 'Vadesi geçmiş',
-  },
-];
-
-const recentActivities = [
-  {
-    id: 1,
-    type: 'payment',
-    message: 'Ahmet Yılmaz Kasım aidatını ödedi',
-    time: '5 dakika önce',
-    status: 'success',
-    icon: CreditCard,
-  },
-  {
-    id: 2,
-    type: 'attendance',
-    message: 'Yıldızlar grubu dersi tamamlandı',
-    time: '1 saat önce',
-    status: 'info',
-    icon: Users,
-    detail: '12/15 katılım',
-  },
-  {
-    id: 3,
-    type: 'member',
-    message: 'Yeni üye kaydı: Elif Kaya',
-    time: '2 saat önce',
-    status: 'success',
-    icon: Users,
-  },
-];
-
-const upcomingLessons = [
-  {
-    id: 1,
-    group: 'Yetişkinler A',
-    time: '10:00 - 11:30',
-    students: 12,
-    coach: 'Mehmet Hoca',
-    color: 'bg-green-500',
-  },
-  {
-    id: 2,
-    group: 'Gençler B',
-    time: '14:00 - 15:30',
-    students: 8,
-    coach: 'Ali Hoca',
-    color: 'bg-emerald-500',
-  },
-  {
-    id: 3,
-    group: 'Minikler',
-    time: '16:00 - 17:00',
-    students: 15,
-    coach: 'Ayşe Hoca',
-    color: 'bg-teal-500',
-  },
-];
-
-const topMembers = [
-  { name: 'Ahmet Yılmaz', attendance: 98, group: 'Yetişkinler A' },
-  { name: 'Elif Demir', attendance: 96, group: 'Gençler B' },
-  { name: 'Can Özkan', attendance: 94, group: 'Yıldızlar' },
-];
+import { membersService } from '@/services/members.service';
+import { groupsService } from '@/services/groups.service';
+import { lessonsService } from '@/services/lessons.service';
+import { paymentsService } from '@/services/payments.service';
+import { formatDistanceToNow } from 'date-fns';
+import { tr } from 'date-fns/locale';
+import type { Lesson, MemberWithGroup, PaymentWithMember } from '@/types';
 
 export default function DashboardPage() {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState({
+    totalMembers: 0,
+    activeGroups: 0,
+    monthlyLessons: 0,
+    pendingPayments: 0,
+    pendingPaymentsCount: 0,
+  });
+  const [recentActivities, setRecentActivities] = useState<any[]>([]);
+  const [upcomingLessons, setUpcomingLessons] = useState<any[]>([]);
+  const [topMembers, setTopMembers] = useState<any[]>([]);
+  const [attendanceRate, setAttendanceRate] = useState(0);
+  const [paymentRate, setPaymentRate] = useState(0);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+      const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+      const startDate = startOfMonth.toISOString().split('T')[0];
+      const endDate = endOfMonth.toISOString().split('T')[0];
+      const today = now.toISOString().split('T')[0];
+      const nextWeek = new Date(now);
+      nextWeek.setDate(now.getDate() + 7);
+      const nextWeekDate = nextWeek.toISOString().split('T')[0];
+
+      // Load members
+      const membersResponse = await membersService.getAll({ 
+        status: 'active',
+        pageSize: 1000 
+      });
+      const totalMembers = membersResponse.total || 0;
+
+      // Load groups
+      const groupsResponse = await groupsService.getAll({ pageSize: 1000 });
+      const activeGroups = groupsResponse.data?.length || 0;
+
+      // Load lessons for this month
+      const lessonsResponse = await lessonsService.getByDateRange(startDate, endDate);
+      const monthlyLessons = lessonsResponse.data?.length || 0;
+
+      // Load overdue payments
+      const overdueResponse = await paymentsService.getOverdue();
+      const overduePayments = overdueResponse.data || [];
+      const pendingAmount = overduePayments.reduce((sum, p) => sum + p.amount, 0);
+
+      // Load upcoming lessons (today + next 7 days)
+      const upcomingResponse = await lessonsService.getByDateRange(today, nextWeekDate);
+      const upcoming = (upcomingResponse.data || [])
+        .filter(l => l.status === 'scheduled')
+        .sort((a, b) => {
+          const dateCompare = a.date.localeCompare(b.date);
+          if (dateCompare !== 0) return dateCompare;
+          return a.start_time.localeCompare(b.start_time);
+        })
+        .slice(0, 3)
+        .map(l => ({
+          id: l.id,
+          group: groupsResponse.data?.find(g => g.id === l.group_id)?.name || 'Bilinmiyor',
+          time: `${l.start_time} - ${l.end_time}`,
+          students: membersResponse.data?.filter(m => m.group_id === l.group_id).length || 0,
+          coach: groupsResponse.data?.find(g => g.id === l.group_id)?.coach?.full_name || 'Atanmadı',
+          color: 'bg-green-500',
+        }));
+
+      // Load recent payments for activities
+      const paymentsResponse = await paymentsService.getAll({ 
+        pageSize: 10,
+        sortBy: 'updated_at',
+        sortOrder: 'desc',
+      });
+      const recentPayments = (paymentsResponse.data || [])
+        .filter(p => p.paid && p.paid_at)
+        .slice(0, 3)
+        .map(p => ({
+          id: p.id,
+          type: 'payment',
+          message: `${p.member.name} ${p.member.surname} ${p.period} aidatını ödedi`,
+          time: formatDistanceToNow(new Date(p.paid_at!), { addSuffix: true, locale: tr }),
+          status: 'success',
+          icon: CreditCard,
+        }));
+
+      // Load recent members for activities
+      const recentMembers = (membersResponse.data || [])
+        .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+        .slice(0, 1)
+        .map(m => ({
+          id: m.id,
+          type: 'member',
+          message: `Yeni üye kaydı: ${m.name} ${m.surname}`,
+          time: formatDistanceToNow(new Date(m.created_at), { addSuffix: true, locale: tr }),
+          status: 'success',
+          icon: Users,
+        }));
+
+      // Combine activities
+      const activities = [...recentPayments, ...recentMembers]
+        .sort((a, b) => {
+          // Simple sort by time (recent first)
+          return 0; // We'll keep the order as is
+        })
+        .slice(0, 3);
+
+      // Calculate attendance rate (placeholder - would need attendance data)
+      setAttendanceRate(87); // Placeholder
+
+      // Calculate payment rate
+      const allPaymentsResponse = await paymentsService.getAll({ pageSize: 1000 });
+      const allPayments = allPaymentsResponse.data || [];
+      const paidCount = allPayments.filter(p => p.paid).length;
+      const totalPayments = allPayments.length;
+      const rate = totalPayments > 0 ? Math.round((paidCount / totalPayments) * 100) : 0;
+      setPaymentRate(rate);
+
+      // Top members (placeholder - would need attendance stats)
+      setTopMembers([
+        { name: 'Veri yok', attendance: 0, group: '-' },
+      ]);
+
+      setStats({
+        totalMembers,
+        activeGroups,
+        monthlyLessons,
+        pendingPayments: pendingAmount,
+        pendingPaymentsCount: overduePayments.length,
+      });
+      setRecentActivities(activities);
+      setUpcomingLessons(upcoming);
+    } catch (error: any) {
+      console.error('Error loading dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="space-y-4 sm:space-y-6 lg:space-y-8 page-transition">
       {/* Welcome Header */}
@@ -151,8 +204,57 @@ export default function DashboardPage() {
 
       {/* Stats Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {stats.map((stat, index) => {
-          const Icon = stat.icon;
+        {loading ? (
+          <>
+            {[1, 2, 3, 4].map(i => (
+              <Card key={i} className="bg-white border-green-100">
+                <CardHeader className="p-3 sm:p-4 pb-1 sm:pb-2">
+                  <Skeleton className="h-4 w-24" />
+                </CardHeader>
+                <CardContent className="p-3 sm:p-4 pt-0">
+                  <Skeleton className="h-8 w-16 mb-2" />
+                  <Skeleton className="h-3 w-20" />
+                </CardContent>
+              </Card>
+            ))}
+          </>
+        ) : (
+          <>
+            {[
+              {
+                title: 'Toplam Üye',
+                value: stats.totalMembers.toString(),
+                change: '',
+                trend: 'neutral' as const,
+                icon: Users,
+                description: 'Aktif üyeler',
+              },
+              {
+                title: 'Aktif Gruplar',
+                value: stats.activeGroups.toString(),
+                change: '',
+                trend: 'neutral' as const,
+                icon: UsersRound,
+                description: 'Toplam grup',
+              },
+              {
+                title: 'Bu Ayki Dersler',
+                value: stats.monthlyLessons.toString(),
+                change: '',
+                trend: 'neutral' as const,
+                icon: Calendar,
+                description: new Date().toLocaleDateString('tr-TR', { month: 'long', year: 'numeric' }),
+              },
+              {
+                title: 'Bekleyen Ödemeler',
+                value: `₺${stats.pendingPayments.toLocaleString('tr-TR')}`,
+                change: `${stats.pendingPaymentsCount} üye`,
+                trend: stats.pendingPaymentsCount > 0 ? 'down' as const : 'neutral' as const,
+                icon: CreditCard,
+                description: 'Vadesi geçmiş',
+              },
+            ].map((stat, index) => {
+              const Icon = stat.icon;
           
           return (
             <Card 
@@ -199,6 +301,8 @@ export default function DashboardPage() {
             </Card>
           );
         })}
+          </>
+        )}
       </div>
 
       {/* Main Content Grid */}
@@ -216,8 +320,19 @@ export default function DashboardPage() {
             </Button>
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="space-y-2 sm:space-y-3">
-              {recentActivities.map((activity) => {
+            {loading ? (
+              <div className="space-y-2 sm:space-y-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : recentActivities.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 text-sm">
+                Henüz aktivite yok
+              </div>
+            ) : (
+              <div className="space-y-2 sm:space-y-3">
+                {recentActivities.map((activity) => {
                 const Icon = activity.icon;
                 const statusClasses = {
                   success: 'bg-green-100 text-green-600',
@@ -251,7 +366,8 @@ export default function DashboardPage() {
                   </div>
                 );
               })}
-            </div>
+              </div>
+            )}
             <Button variant="ghost" size="sm" className="w-full mt-3 text-green-600 hover:text-green-700 hover:bg-green-50 text-xs sm:hidden">
               Tümünü Gör
             </Button>
@@ -272,8 +388,19 @@ export default function DashboardPage() {
             </Link>
           </CardHeader>
           <CardContent className="p-3 sm:p-6 pt-0">
-            <div className="space-y-2 sm:space-y-3">
-              {upcomingLessons.map((lesson) => (
+            {loading ? (
+              <div className="space-y-2 sm:space-y-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-16 w-full" />
+                ))}
+              </div>
+            ) : upcomingLessons.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 text-sm">
+                Yaklaşan ders yok
+              </div>
+            ) : (
+              <div className="space-y-2 sm:space-y-3">
+                {upcomingLessons.map((lesson) => (
                 <div
                   key={lesson.id}
                   className="relative p-3 sm:p-4 rounded-xl bg-gray-50/50 hover:bg-green-50/50 transition-all cursor-pointer overflow-hidden group border border-transparent hover:border-green-100"
@@ -300,7 +427,8 @@ export default function DashboardPage() {
                   </div>
                 </div>
               ))}
-            </div>
+              </div>
+            )}
             
             <Link href="/lessons">
               <Button 
@@ -330,19 +458,25 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="flex items-end justify-between mb-2 sm:mb-3">
-              <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-green-600">87%</div>
-              <div className="flex items-center gap-1 text-green-600 text-xs sm:text-sm">
-                <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
-                +3%
-              </div>
-            </div>
-            <div className="h-2 rounded-full bg-green-100 overflow-hidden">
-              <div 
-                className="h-full rounded-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-1000"
-                style={{ width: '87%' }}
-              />
-            </div>
+            {loading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : (
+              <>
+                <div className="flex items-end justify-between mb-2 sm:mb-3">
+                  <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-green-600">{attendanceRate}%</div>
+                  <div className="flex items-center gap-1 text-green-600 text-xs sm:text-sm">
+                    <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4" />
+                    Bu ay
+                  </div>
+                </div>
+                <div className="h-2 rounded-full bg-green-100 overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-gradient-to-r from-green-500 to-green-400 transition-all duration-1000"
+                    style={{ width: `${attendanceRate}%` }}
+                  />
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -360,18 +494,24 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="flex items-end justify-between mb-2 sm:mb-3">
-              <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-amber-600">78%</div>
-              <div className="text-xs sm:text-sm text-gray-500">
-                97 / 124 üye
-              </div>
-            </div>
-            <div className="h-2 rounded-full bg-amber-100 overflow-hidden">
-              <div 
-                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-1000"
-                style={{ width: '78%' }}
-              />
-            </div>
+            {loading ? (
+              <Skeleton className="h-12 w-full" />
+            ) : (
+              <>
+                <div className="flex items-end justify-between mb-2 sm:mb-3">
+                  <div className="text-3xl sm:text-4xl lg:text-5xl font-bold text-amber-600">{paymentRate}%</div>
+                  <div className="text-xs sm:text-sm text-gray-500">
+                    {stats.totalMembers > 0 ? `${Math.round((paymentRate / 100) * stats.totalMembers)} / ${stats.totalMembers} üye` : '0 üye'}
+                  </div>
+                </div>
+                <div className="h-2 rounded-full bg-amber-100 overflow-hidden">
+                  <div 
+                    className="h-full rounded-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-1000"
+                    style={{ width: `${paymentRate}%` }}
+                  />
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -389,8 +529,19 @@ export default function DashboardPage() {
             </div>
           </CardHeader>
           <CardContent className="p-4 sm:p-6 pt-0">
-            <div className="space-y-2 sm:space-y-3">
-              {topMembers.map((member, i) => (
+            {loading ? (
+              <div className="space-y-2 sm:space-y-3">
+                {[1, 2, 3].map(i => (
+                  <Skeleton key={i} className="h-12 w-full" />
+                ))}
+              </div>
+            ) : topMembers.length === 0 || topMembers[0].name === 'Veri yok' ? (
+              <div className="text-center py-8 text-gray-500 text-sm">
+                Katılım verisi henüz yok
+              </div>
+            ) : (
+              <div className="space-y-2 sm:space-y-3">
+                {topMembers.map((member, i) => (
                 <div key={member.name} className="flex items-center gap-2 sm:gap-3">
                   <div className="flex items-center justify-center h-5 w-5 sm:h-6 sm:w-6 rounded-full bg-green-100 text-[10px] sm:text-xs font-medium text-green-700">
                     {i + 1}
@@ -413,7 +564,8 @@ export default function DashboardPage() {
                   </Badge>
                 </div>
               ))}
-            </div>
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
