@@ -66,14 +66,13 @@ export async function POST(request: NextRequest) {
         lesson_id: lessonIdStr,
         member_id: item.member_id,
         status: item.status,
-        notes: null, // tablo Insert tipinde zorunlu ise gereklidir
       })
     );
 
     // Upsert attendance records
     const { data, error } = await supabase
       .from('attendance')
-      .upsert(records, {
+      .upsert(records as any, {
         onConflict: 'lesson_id,member_id',
         ignoreDuplicates: false,
       })
