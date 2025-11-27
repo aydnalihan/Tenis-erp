@@ -34,6 +34,7 @@ export interface Lesson {
   start_time: string;
   end_time: string;
   notes: string | null;
+  status: 'scheduled' | 'completed' | 'cancelled';
   created_at: string;
   updated_at: string;
 }
