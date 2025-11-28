@@ -35,12 +35,17 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { StatsCard } from '@/components/shared';
+import { InventoryFormDialog } from '@/components/inventory/inventory-form-dialog';
+import { InventoryFormValues } from '@/lib/validations/inventory';
 
 export default function InventoryPage() {
   const [inventory, setInventory] = useState<InventoryItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('Tümü');
+  const [formDialogOpen, setFormDialogOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<InventoryItem | null>(null);
+  const [formLoading, setFormLoading] = useState(false);
 
   useEffect(() => {
     loadInventory();
@@ -85,6 +90,46 @@ export default function InventoryPage() {
     return { label: 'Yeterli', color: 'bg-green-100 text-green-700 border-0' };
   };
 
+  const handleAddClick = () => {
+    setEditingItem(null);
+    setFormDialogOpen(true);
+  };
+
+  const handleEditClick = (item: InventoryItem) => {
+    setEditingItem(item);
+    setFormDialogOpen(true);
+  };
+
+  const handleFormSubmit = async (data: InventoryFormValues) => {
+    try {
+      setFormLoading(true);
+      if (editingItem) {
+        const response = await inventoryService.update(editingItem.id, data);
+        if (response.success) {
+          toast.success('Ekipman güncellendi');
+          setFormDialogOpen(false);
+          await loadInventory();
+        } else {
+          toast.error(response.error || 'Güncelleme başarısız');
+        }
+      } else {
+        const response = await inventoryService.create(data);
+        if (response.success) {
+          toast.success('Ekipman eklendi');
+          setFormDialogOpen(false);
+          await loadInventory();
+        } else {
+          toast.error(response.error || 'Ekleme başarısız');
+        }
+      }
+    } catch (error: any) {
+      console.error('Error saving inventory:', error);
+      toast.error(error?.message || 'Bir hata oluştu');
+    } finally {
+      setFormLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-4 sm:space-y-6 page-transition">
       {/* Page Header */}
@@ -95,7 +140,10 @@ export default function InventoryPage() {
             Kulüp ekipman ve malzemelerini yönetin
           </p>
         </div>
-        <Button className="gap-2 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 text-sm w-full sm:w-auto">
+        <Button 
+          onClick={handleAddClick}
+          className="gap-2 bg-green-600 hover:bg-green-700 shadow-lg shadow-green-200 text-sm w-full sm:w-auto"
+        >
           <Plus className="h-4 w-4" />
           Yeni Ekipman Ekle
         </Button>
@@ -226,12 +274,33 @@ export default function InventoryPage() {
                         </Button>
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="border-green-100">
-                        <DropdownMenuItem className="cursor-pointer text-sm">
+                        <DropdownMenuItem 
+                          className="cursor-pointer text-sm"
+                          onClick={() => handleEditClick(item)}
+                        >
                           <Edit className="h-4 w-4 mr-2 text-gray-400" />
                           Düzenle
                         </DropdownMenuItem>
                         <DropdownMenuSeparator className="bg-green-100" />
-                        <DropdownMenuItem className="text-red-500 hover:bg-red-50 cursor-pointer text-sm">
+                        <DropdownMenuItem 
+                          className="text-red-500 hover:bg-red-50 cursor-pointer text-sm"
+                          onClick={async () => {
+                            if (confirm('Bu ekipmanı silmek istediğinize emin misiniz?')) {
+                              try {
+                                const response = await inventoryService.delete(item.id);
+                                if (response.success) {
+                                  toast.success('Ekipman silindi');
+                                  await loadInventory();
+                                } else {
+                                  toast.error(response.error || 'Silme başarısız');
+                                }
+                              } catch (error: any) {
+                                console.error('Error deleting inventory:', error);
+                                toast.error(error?.message || 'Bir hata oluştu');
+                              }
+                            }
+                          }}
+                        >
                           <Trash2 className="h-4 w-4 mr-2" />
                           Sil
                         </DropdownMenuItem>
@@ -311,11 +380,32 @@ export default function InventoryPage() {
                             Stok Çıkar
                           </DropdownMenuItem>
                           <DropdownMenuSeparator className="bg-green-100" />
-                          <DropdownMenuItem className="cursor-pointer">
+                          <DropdownMenuItem 
+                            className="cursor-pointer"
+                            onClick={() => handleEditClick(item)}
+                          >
                             <Edit className="h-4 w-4 mr-2 text-gray-400" />
                             Düzenle
                           </DropdownMenuItem>
-                          <DropdownMenuItem className="text-red-500 hover:bg-red-50 cursor-pointer">
+                          <DropdownMenuItem 
+                            className="text-red-500 hover:bg-red-50 cursor-pointer"
+                            onClick={async () => {
+                              if (confirm('Bu ekipmanı silmek istediğinize emin misiniz?')) {
+                                try {
+                                  const response = await inventoryService.delete(item.id);
+                                  if (response.success) {
+                                    toast.success('Ekipman silindi');
+                                    await loadInventory();
+                                  } else {
+                                    toast.error(response.error || 'Silme başarısız');
+                                  }
+                                } catch (error: any) {
+                                  console.error('Error deleting inventory:', error);
+                                  toast.error(error?.message || 'Bir hata oluştu');
+                                }
+                              }
+                            }}
+                          >
                             <Trash2 className="h-4 w-4 mr-2" />
                             Sil
                           </DropdownMenuItem>
@@ -331,6 +421,15 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Inventory Form Dialog */}
+      <InventoryFormDialog
+        open={formDialogOpen}
+        onOpenChange={setFormDialogOpen}
+        item={editingItem}
+        loading={formLoading}
+        onSubmit={handleFormSubmit}
+      />
     </div>
   );
 }

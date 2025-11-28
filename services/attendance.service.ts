@@ -2,6 +2,8 @@ import { createClient } from '@/lib/supabase/client';
 import type { Attendance, ApiResponse } from '@/types';
 import type { Database } from '@/lib/supabase';
 
+type LessonUpdate = Database['public']['Tables']['lessons']['Update'];
+
 type AttendanceInsert = Database['public']['Tables']['attendance']['Insert'];
 
 // Lazy initialization - client is created when first needed
@@ -59,6 +61,19 @@ export const attendanceService = {
     if (error) {
       return { data: null, error: error.message, success: false };
     }
+
+    // Update lesson status to 'completed'
+    const lessonUpdate: LessonUpdate = {
+      status: 'completed',
+    };
+    type LessonQueryBuilder = {
+      update: (values: LessonUpdate) => {
+        eq: (column: string, value: string) => Promise<{ error: { message: string } | null }>;
+      };
+    };
+    await (supabase.from('lessons') as unknown as LessonQueryBuilder)
+      .update(lessonUpdate)
+      .eq('id', lessonId);
 
     return { data: data as Attendance[], error: null, success: true };
   },

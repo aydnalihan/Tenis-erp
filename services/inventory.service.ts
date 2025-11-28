@@ -84,11 +84,11 @@ export const inventoryService = {
   async update(id: string, itemData: Partial<InventoryFormData>): Promise<ApiResponse<InventoryItem>> {
     const supabase = getSupabaseClient();
     const updateData: InventoryUpdate = {
-      name: itemData.name,
-      category: itemData.category !== undefined ? (itemData.category || null) : undefined,
-      quantity: itemData.quantity,
-      min_stock: itemData.min_stock,
-      description: itemData.description !== undefined ? (itemData.description || null) : undefined,
+      ...(itemData.name !== undefined && { name: itemData.name }),
+      ...(itemData.category !== undefined && { category: itemData.category || null }),
+      ...(itemData.quantity !== undefined && { quantity: itemData.quantity }),
+      ...(itemData.min_stock !== undefined && { min_stock: itemData.min_stock }),
+      ...(itemData.description !== undefined && { description: itemData.description || null }),
     };
     // Type assertion needed because Supabase type inference fails for update() with complex schemas
     type InventoryQueryBuilder = {

@@ -55,7 +55,7 @@ export const paymentsService = {
       amount: paymentData.amount,
       paid: paymentData.paid || false,
       paid_at: paymentData.paid ? new Date().toISOString() : null,
-      notes: 'notes' in paymentData ? ((paymentData as PaymentFormData & { notes?: string }).notes || null) : null,
+      notes: paymentData.notes || null,
     };
     // Type assertion needed because Supabase type inference fails for insert() with complex schemas
     type PaymentQueryBuilder = {

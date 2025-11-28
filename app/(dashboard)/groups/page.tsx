@@ -113,8 +113,8 @@ export default function GroupsPage() {
       if (editingGroup) {
         const response = await groupsService.update(editingGroup.id, {
           name: data.name,
-          description: data.description || undefined,
-          coach_id: data.coach_id || undefined,
+          description: data.description !== undefined ? (data.description || null) : undefined,
+          coach_id: data.coach_id !== undefined ? (data.coach_id || null) : undefined,
         });
         
         if (response.success) {
@@ -126,8 +126,8 @@ export default function GroupsPage() {
       } else {
         const response = await groupsService.create({
           name: data.name,
-          description: data.description || undefined,
-          coach_id: data.coach_id || undefined,
+          description: data.description || null,
+          coach_id: data.coach_id || null,
         });
         
         if (response.success) {

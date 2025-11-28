@@ -142,8 +142,8 @@ export interface MemberFormData {
 
 export interface GroupFormData {
   name: string;
-  description?: string;
-  coach_id?: string;
+  description?: string | null;
+  coach_id?: string | null;
 }
 
 export interface LessonFormData {
@@ -160,6 +160,7 @@ export interface PaymentFormData {
   period: string;
   amount: number;
   paid: boolean;
+  notes?: string;
 }
 
 export interface InventoryFormData {

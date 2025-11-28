@@ -42,8 +42,10 @@ import { toast } from 'sonner';
 export default function AttendancePage() {
   const [groups, setGroups] = useState<Group[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [members, setMembers] = useState<MemberWithGroup[]>([]);
+  const [members, setMembers] = useState<MemberWithGroup[]>([]); // Selected group members
+  const [allMembers, setAllMembers] = useState<MemberWithGroup[]>([]); // All members for stats
   const [existingAttendance, setExistingAttendance] = useState<Attendance[]>([]);
+  const [allAttendance, setAllAttendance] = useState<Attendance[]>([]); // For recent attendance display
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -65,6 +67,12 @@ export default function AttendancePage() {
       });
       setGroups(groupsResponse.data || []);
       
+      // Load all members for statistics
+      const allMembersResponse = await membersService.getAll({
+        pageSize: 1000,
+      });
+      setAllMembers(allMembersResponse.data || []);
+      
       // Load lessons for current month
       const now = new Date();
       const startDate = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
@@ -72,7 +80,36 @@ export default function AttendancePage() {
       
       const lessonsResponse = await lessonsService.getByDateRange(startDate, endDate);
       if (lessonsResponse.success && lessonsResponse.data) {
-        setLessons(lessonsResponse.data);
+        const loadedLessons = lessonsResponse.data;
+        setLessons(loadedLessons);
+        
+        // Load attendance for all completed lessons immediately
+        const completedLessonIds = loadedLessons
+          .filter(l => l.status === 'completed')
+          .map(l => l.id);
+        
+        if (completedLessonIds.length > 0) {
+          try {
+            const attendancePromises = completedLessonIds.map(lessonId =>
+              attendanceService.getByLesson(lessonId)
+            );
+            
+            const attendanceResults = await Promise.all(attendancePromises);
+            
+            const combinedAttendance: Attendance[] = [];
+            attendanceResults.forEach(result => {
+              if (result.success && result.data) {
+                combinedAttendance.push(...result.data);
+              }
+            });
+            
+            setAllAttendance(combinedAttendance);
+          } catch (error: any) {
+            console.error('Error loading attendance data:', error);
+          }
+        } else {
+          setAllAttendance([]);
+        }
       }
     } catch (error: any) {
       console.error('Error loading data:', error);
@@ -81,6 +118,8 @@ export default function AttendancePage() {
       setLoading(false);
     }
   };
+
+  // Note: allAttendance is now loaded inside loadData() to ensure it's always in sync with lessons
 
   useEffect(() => {
     const loadGroupMembers = async () => {
@@ -176,12 +215,26 @@ export default function AttendancePage() {
       
       if (response.success) {
         toast.success('Yoklama başarıyla kaydedildi');
-        // Reload lesson attendance
+        
+        // Reload lesson attendance for selected lesson
         const attendanceResponse = await attendanceService.getByLesson(selectedLessonId);
         if (attendanceResponse.success && attendanceResponse.data) {
           setExistingAttendance(attendanceResponse.data);
+          // Immediately update allAttendance with new data
+          setAllAttendance(prev => {
+            // Remove old attendance for this lesson
+            const filtered = prev.filter(a => a.lesson_id !== selectedLessonId);
+            // Add new attendance
+            return [...filtered, ...attendanceResponse.data!];
+          });
         }
-        // Reload lessons to update status
+        
+        // Update lesson status in local state immediately
+        setLessons(prev => prev.map(l => 
+          l.id === selectedLessonId ? { ...l, status: 'completed' as const } : l
+        ));
+        
+        // Reload lessons to ensure data is in sync (this will also reload allAttendance)
         await loadData();
       } else {
         toast.error(response.error || 'Yoklama kaydedilemedi');
@@ -203,7 +256,7 @@ export default function AttendancePage() {
     
     return completedLessons.map(lesson => {
       const group = groups.find(g => g.id === lesson.group_id);
-      const lessonAttendance = existingAttendance.filter(a => a.lesson_id === lesson.id);
+      const lessonAttendance = allAttendance.filter(a => a.lesson_id === lesson.id);
       const present = lessonAttendance.filter(a => a.status === 'present').length;
       const absent = lessonAttendance.filter(a => a.status === 'absent').length;
       
@@ -215,7 +268,60 @@ export default function AttendancePage() {
         absent,
       };
     });
-  }, [lessons, groups, existingAttendance]);
+  }, [lessons, groups, allAttendance]);
+
+  // Calculate absentee statistics for all members
+  const absenteeStats = useMemo(() => {
+    if (allAttendance.length === 0 || allMembers.length === 0) {
+      return [];
+    }
+
+    // Get all unique member IDs from attendance
+    const memberIds = new Set(allAttendance.map(a => a.member_id));
+    
+    // Calculate stats for each member
+    const stats = Array.from(memberIds).map(memberId => {
+      const member = allMembers.find(m => m.id === memberId);
+      if (!member) return null;
+
+      // Get all attendance records for this member
+      const memberAttendance = allAttendance.filter(a => a.member_id === memberId);
+      
+      // Count present and absent
+      const present = memberAttendance.filter(a => a.status === 'present').length;
+      const absent = memberAttendance.filter(a => a.status === 'absent').length;
+      const total = present + absent;
+      
+      // Calculate attendance rate
+      const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+
+      return {
+        memberId: member.id,
+        memberName: `${member.name} ${member.surname}`,
+        groupName: member.group?.name || 'Grup Yok',
+        total,
+        present,
+        absent,
+        rate,
+      };
+    }).filter(Boolean) as Array<{
+      memberId: string;
+      memberName: string;
+      groupName: string;
+      total: number;
+      present: number;
+      absent: number;
+      rate: number;
+    }>;
+
+    // Sort by absent count (descending), then by rate (ascending)
+    return stats.sort((a, b) => {
+      if (b.absent !== a.absent) {
+        return b.absent - a.absent;
+      }
+      return a.rate - b.rate;
+    }).slice(0, 10); // Top 10
+  }, [allAttendance, allMembers]);
 
   if (loading) {
     return (
@@ -526,12 +632,43 @@ export default function AttendancePage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {/* TODO: Implement absentee stats from Supabase */}
-                <TableRow className="border-green-50 hover:bg-green-50/50">
-                  <TableCell colSpan={5} className="text-center text-gray-400 text-xs sm:text-sm py-8">
-                    Devamsızlık istatistikleri yakında eklenecek
-                  </TableCell>
-                </TableRow>
+                {absenteeStats.length === 0 ? (
+                  <TableRow className="border-green-50 hover:bg-green-50/50">
+                    <TableCell colSpan={5} className="text-center text-gray-400 text-xs sm:text-sm py-8">
+                      Henüz devamsızlık verisi yok
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  absenteeStats.map((stat) => (
+                    <TableRow key={stat.memberId} className="border-green-50 hover:bg-green-50/50">
+                      <TableCell className="text-gray-700 text-xs sm:text-sm font-medium">
+                        {stat.memberName}
+                      </TableCell>
+                      <TableCell className="text-gray-600 text-xs sm:text-sm">
+                        {stat.groupName}
+                      </TableCell>
+                      <TableCell className="text-center text-gray-700 text-xs sm:text-sm font-medium">
+                        {stat.total}
+                      </TableCell>
+                      <TableCell className="text-center text-green-600 text-xs sm:text-sm font-medium">
+                        {stat.present}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <Badge 
+                          className={
+                            stat.rate >= 80 
+                              ? 'bg-green-100 text-green-700 border-0 text-[10px] sm:text-xs' 
+                              : stat.rate >= 60 
+                              ? 'bg-amber-100 text-amber-700 border-0 text-[10px] sm:text-xs'
+                              : 'bg-red-100 text-red-700 border-0 text-[10px] sm:text-xs'
+                          }
+                        >
+                          %{stat.rate}
+                        </Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))
+                )}
               </TableBody>
             </Table>
           </div>

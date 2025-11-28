@@ -105,9 +105,9 @@ export const groupsService = {
   async update(id: string, groupData: Partial<GroupFormData>): Promise<ApiResponse<Group>> {
     const supabase = getSupabaseClient();
     const updateData: GroupUpdate = {
-      name: groupData.name,
-      description: groupData.description !== undefined ? (groupData.description || null) : undefined,
-      coach_id: groupData.coach_id !== undefined ? (groupData.coach_id || null) : undefined,
+      ...(groupData.name !== undefined && { name: groupData.name }),
+      ...(groupData.description !== undefined && { description: groupData.description || null }),
+      ...(groupData.coach_id !== undefined && { coach_id: groupData.coach_id || null }),
     };
     // Type assertion needed because Supabase type inference fails for update() with complex schemas
     type GroupQueryBuilder = {

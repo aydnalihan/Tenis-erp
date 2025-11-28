@@ -119,9 +119,31 @@ export default function ReportsPage() {
       });
       setGroupDistribution(distribution);
       
-      // Calculate attendance stats (simplified - would need more complex query in production)
-      const totalAttendance = completedLessons.length * 10; // Estimate
-      const possibleAttendance = lessons.length * 10; // Estimate
+      // Load attendance data for completed lessons
+      const completedLessonIds = completedLessons.map(l => l.id);
+      let allAttendance: any[] = [];
+      
+      if (completedLessonIds.length > 0) {
+        try {
+          const attendancePromises = completedLessonIds.map(lessonId =>
+            attendanceService.getByLesson(lessonId)
+          );
+          
+          const attendanceResults = await Promise.all(attendancePromises);
+          
+          attendanceResults.forEach(result => {
+            if (result.success && result.data) {
+              allAttendance.push(...result.data);
+            }
+          });
+        } catch (error: any) {
+          console.error('Error loading attendance data:', error);
+        }
+      }
+      
+      // Calculate attendance stats from actual data
+      const totalAttendance = allAttendance.filter(a => a.status === 'present').length;
+      const possibleAttendance = completedLessons.length * (allMembers.length || 1); // Estimate based on members
       const attendanceRate = possibleAttendance > 0 ? Math.round((totalAttendance / possibleAttendance) * 100) : 0;
       
       setMonthlyStats({
@@ -135,8 +157,35 @@ export default function ReportsPage() {
         collectedRevenue,
       });
       
-      // TODO: Calculate top absentees (would need attendance aggregation)
-      setTopAbsentees([]);
+      // Calculate top absentees from attendance data
+      const memberIds = new Set(allAttendance.map((a: any) => a.member_id));
+      const absenteesList = Array.from(memberIds).map(memberId => {
+        const member = allMembers.find(m => m.id === memberId);
+        if (!member) return null;
+
+        const memberAttendance = allAttendance.filter((a: any) => a.member_id === memberId);
+        const present = memberAttendance.filter((a: any) => a.status === 'present').length;
+        const absent = memberAttendance.filter((a: any) => a.status === 'absent').length;
+        const total = present + absent;
+        const rate = total > 0 ? Math.round((present / total) * 100) : 0;
+
+        return {
+          name: `${member.name} ${member.surname}`,
+          group: member.group?.name || 'Grup Yok',
+          absences: absent,
+          rate,
+        };
+      }).filter(Boolean) as Array<{ name: string; group: string; absences: number; rate: number }>;
+
+      // Sort by absences (descending), then by rate (ascending)
+      const sortedAbsentees = absenteesList.sort((a, b) => {
+        if (b.absences !== a.absences) {
+          return b.absences - a.absences;
+        }
+        return a.rate - b.rate;
+      });
+
+      setTopAbsentees(sortedAbsentees);
       
     } catch (error: any) {
       console.error('Error loading reports:', error);
